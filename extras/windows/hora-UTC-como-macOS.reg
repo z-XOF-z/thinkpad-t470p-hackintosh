@@ -1,0 +1,7 @@
+Windows Registry Editor Version 5.00
+
+; Hace que Windows guarde la hora del BIOS en UTC, igual que macOS.
+; Asi la hora no se mueve al cambiar entre Windows y macOS.
+; Para deshacer: borrar el valor RealTimeIsUniversal de esa misma llave.
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TimeZoneInformation]
+"RealTimeIsUniversal"=hex(b):01,00,00,00,00,00,00,00

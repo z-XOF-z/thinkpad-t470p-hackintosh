@@ -1,0 +1,6 @@
+.DS_Store
+._*
+USB-T470p/
+MI-SMBIOS.txt
+__pycache__/
+config.antes-*.plist

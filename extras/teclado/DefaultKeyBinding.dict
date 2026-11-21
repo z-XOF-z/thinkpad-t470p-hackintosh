@@ -1,0 +1,11 @@
+{
+  /* Inicio/Fin como en Windows (con Shift selecciona, con Ctrl va al inicio/fin del documento) */
+  "\UF729"   = "moveToBeginningOfLine:";
+  "\UF72B"   = "moveToEndOfLine:";
+  "$\UF729"  = "moveToBeginningOfLineAndModifySelection:";
+  "$\UF72B"  = "moveToEndOfLineAndModifySelection:";
+  "^\UF729"  = "moveToBeginningOfDocument:";
+  "^\UF72B"  = "moveToEndOfDocument:";
+  "^$\UF729" = "moveToBeginningOfDocumentAndModifySelection:";
+  "^$\UF72B" = "moveToEndOfDocumentAndModifySelection:";
+}
