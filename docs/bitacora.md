@@ -642,3 +642,16 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
   - Librerías (sacadas de las notas de Obsidian): LiquidCrystal I2C, DHT sensor library + Adafruit Unified Sensor, OneWire, DallasTemperature, Adafruit Motor Shield (V1 = AFMotor y V2), RTClib, TinyGPSPlus, Adafruit NeoPixel y Adafruit BusIO.
   - Probado: compila un sketch para `esp32:esp32:esp32s3:PartitionScheme=app3M_fat9M_16MB,FlashSize=16M,PSRAM=opi,CDCOnBoot=cdc` (ESP32-S3 N16R8) y otro para `arduino:avr:uno`.
 - **eqMac 1.9.2** (notarizado por Bitgapp) en /Applications: ecualizador para todo el sistema. El Atmos/Audio Espacial real solo funciona con AirPods.
+
+### 2026-11-21 05:25 - Apps instaladas
+- The Unarchiver (MacPaw, dl.devmate.com), IINA 1.5.1, AltTab 11.10.2, Hidden Bar 1.13.2 (consolelabs/dwarvesf) y AppCleaner 3.7. Todas notarizadas (verificado con spctl), en /Applications.
+- AltTab: atajo Opción+Tab, que en esta laptop es Alt+Tab físico (por el cambio de Ctrl/Comando, Alt sigue siendo Opción). Pide permisos de Accesibilidad y Grabación de pantalla.
+
+### 2026-11-21 12:10 - Suspensión con la tapa: funciona; ventilador en automático al dormir
+- Prueba en vivo (monitor de AppleClamshellState + pmset log), sin la TV: 12:03:06 tapa cerrada → ~12:03:22 suspensión → 12:03:41 "Wake from Normal Sleep … power-button". **La suspensión funciona.**
+  En la prueba anterior no se suspendió porque la TV estaba conectada con el cargador: macOS se queda en modo clamshell a propósito.
+- Al abrir la tapa no despierta sola: hay que apretar una tecla o el botón de encendido (DriverReason XHC / power-button).
+- Suspensión por inactividad: pmset `displaysleep 10`, `sleep 1`. Sin música ni descargas (aserciones PreventUserIdleSystemSleep), la pantalla se apaga a los 10 min y el sistema se suspende un momento después.
+- **BateriaT470p:**
+  - Al suspender pone el ventilador en automático (`FanSpeed` = 0x84, lo maneja el EC); 3 s después de despertar regresa al nivel guardado de YogaSMCNC (`FanLevel` 71 = 0x47 = Full).
+  - Opción nueva "Suspender al cerrar la tapa aunque esté la TV" (apagada por defecto): si la tapa está cerrada y hay pantalla externa, hace `pmset sleepnow`.

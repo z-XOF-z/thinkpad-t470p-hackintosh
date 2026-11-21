@@ -43,6 +43,25 @@ func pausarCarga(_ v: Bool) { poner("Battery", 1); poner("setCMInhibitCharge", v
 // LED del punto rojo de la "i" en la tapa (metodo LED, EC 0x0C): 0x0A apagado, 0x8A prendido, 0xCA parpadeo
 func puntoRojo(_ v: Int) { poner("LED", v) }
 
+// --- Suspension: ventilador en automatico mientras duerme, y opcion de dormir con la tapa aunque haya TV ---
+// FanSpeed (YogaSMC): >7 y <0x80 -> 0x47 (full); >=0x80 -> 0x84 (automatico, lo maneja el EC)
+func ventiladorAuto() { poner("FanSpeed", 0x84) }
+func ventiladorComoYogaSMC() {
+    // YogaSMCNC guarda el nivel elegido en FanLevel (71 = 0x47 = Full); si no hay, se deja automatico
+    let nivel = UserDefaults(suiteName: "org.zhen.YogaSMC")?.integer(forKey: "FanLevel") ?? 0
+    if nivel == 0x47 { poner("FanSpeed", 0x47) } else if nivel > 0 { poner("FanSpeed", nivel) }
+}
+let raiz = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
+func tapaCerrada() -> Bool {
+    (IORegistryEntryCreateCFProperty(raiz, "AppleClamshellState" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? Bool) ?? false
+}
+func hayPantallaExterna() -> Bool {
+    var ids = [CGDirectDisplayID](repeating: 0, count: 8); var n: UInt32 = 0
+    CGGetOnlineDisplayList(8, &ids, &n)
+    return ids.prefix(Int(n)).contains { CGDisplayIsBuiltin($0) == 0 }
+}
+let claveTapaTV = "DormirConTapaAunqueHayaTV"
+
 let luz = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/LuzTeclado").path
 let pidLuz = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Application Support/LuzTeclado/respirar.pid").path
@@ -76,6 +95,22 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         poner("Battery", 1)
         actualizarIcono()
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.actualizarIcono() }
+
+        let ws = NSWorkspace.shared.notificationCenter
+        ws.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { _ in ventiladorAuto() }
+        ws.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { ventiladorComoYogaSMC() }
+        }
+        // Tapa cerrada + TV conectada: macOS NO duerme (modo clamshell). Si la opcion esta activa, dormir igual.
+        var yaPedido = false
+        Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
+            let cerrada = tapaCerrada()
+            if !cerrada { yaPedido = false; return }
+            guard UserDefaults.standard.bool(forKey: claveTapaTV), !yaPedido, hayPantallaExterna() else { return }
+            yaPedido = true
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/pmset"); p.arguments = ["sleepnow"]
+            try? p.run()
+        }
     }
 
     func actualizarIcono() {
@@ -134,6 +169,11 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         r.submenu = subLuz
         m.addItem(r)
         m.addItem(.separator())
+        let tt = NSMenuItem(title: "Suspender al cerrar la tapa aunque este la TV", action: #selector(tapaTV(_:)), keyEquivalent: "")
+        tt.target = self
+        tt.state = UserDefaults.standard.bool(forKey: claveTapaTV) ? .on : .off
+        m.addItem(tt)
+        m.addItem(.separator())
         let s = NSMenuItem(title: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         m.addItem(s)
     }
@@ -144,6 +184,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func pausa(_ s: NSMenuItem) { pausarCarga(!cargaEnPausa()) }
+    @objc func tapaTV(_ s: NSMenuItem) { UserDefaults.standard.set(!UserDefaults.standard.bool(forKey: claveTapaTV), forKey: claveTapaTV) }
     @objc func fn(_ s: NSMenuItem) { ponerFnLock(!fnLock()) }
     @objc func punto(_ s: NSMenuItem) { puntoRojo(s.tag) }
 
