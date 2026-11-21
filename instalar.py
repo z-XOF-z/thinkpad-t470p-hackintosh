@@ -81,7 +81,7 @@ def conseguir_efi(trabajo):
     if os.path.isfile(local):
         print(f"    Uso la EFI del repo: {os.path.join(aqui, 'EFI')}")
         return os.path.join(aqui, "EFI")
-    if "/" not in REPO or REPO == "z-XOF-z/thinkpad-t470p-hackintosh":
+    if "/" not in REPO:
         sys.exit(f"{ROJO}No encontré la carpeta EFI junto al script. Clona el repo y córrelo desde ahí.{FIN}")
     print(f"    Bajando el repo {REPO} ...")
     z = zipfile.ZipFile(io.BytesIO(bajar(f"https://github.com/{REPO}/archive/refs/heads/main.zip")))
