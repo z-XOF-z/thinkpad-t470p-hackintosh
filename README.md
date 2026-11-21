@@ -50,7 +50,8 @@ Al terminar tienes la carpeta `USB-T470p/` con `EFI/` y `com.apple.recovery.boot
 | Componente | Estado | Cómo |
 |---|---|---|
 | Gráfica HD 630 | ✅ Metal 3, aceleración completa | WhateverGreen, `ig-platform-id 0x591B0000` |
-| HDMI | ✅ detecta al arrancar | parche `con1` + `igfxonln=1` |
+| HDMI | ✅ detecta al arrancar, RGB a 75 Hz | parche `con1` + `igfxonln=1` + override de la TV |
+| Panel a 75 Hz | ✅ | override del EDID (60 → 75 Hz) |
 | WiFi | ✅ **nativo** (icono de WiFi de macOS, Ubicación) | AirportItlwm Tahoe 2.4.0 |
 | Bluetooth | ✅ AirPods, iPhone, bocinas | IntelBluetoothFirmware 2.5.3 + BlueToolFixup |
 | Audio (bocina, audífonos, micrófono) | ✅ | AppleALC layout **29** + AppleHDA por root patch (OCLP-Mod) |
@@ -79,6 +80,7 @@ Al terminar tienes la carpeta `USB-T470p/` con `EFI/` y `com.apple.recovery.boot
 | **LuzTeclado** | Respiración de la luz del teclado (rápida, media, lenta) con candado de una sola instancia |
 | **TeclaWindows** | Tecla Windows sola abre Apps; con el brillo al mínimo, "bajar brillo" **apaga el panel** de verdad y "subir brillo" lo prende |
 | **PantallaHz** + `pantalla-hz.sh` | Agrega un modo de **75 Hz** al panel (override del EDID) y lo prueba con confirmación de 30 s en todas las pantallas (si no confirmas, regresa a 60 Hz) |
+| `tv-pantalla.sh` + `PantallaHz tv` | TV por HDMI: fuerza **RGB** (quita YCbCr del EDID: texto nítido y colores correctos) y agrega 1360×768 a **75 Hz** |
 
 > Aprendido: en la T470p cada cambio de la luz del teclado por software genera el mismo evento ACPI (0x1012) que Fn + Espacio.
 > Por eso la respiración no se engancha a esa tecla (se creaba un bucle).

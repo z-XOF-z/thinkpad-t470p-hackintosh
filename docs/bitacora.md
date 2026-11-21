@@ -597,3 +597,48 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
   - Se corrigió un bloqueo: la lista de `ps` se leía después de esperarlo y se trababa.
   - Probado: rápido → medio → lento deja siempre 1 proceso; `parar` deja 0.
 - BateriaT470p: submenú "Luz del teclado" con Normal / Respirar rápido / medio / lento, con palomita en el modo activo.
+
+### 2026-11-21 04:50 - Panel a 75 Hz (preparado), apagar el panel con el brillo y GitHub
+- **Panel:** BOE NV140FHM-N46, **14"** (no 15.6; se corrigió el fondo del menú). EDID: modo 1 = 60 Hz (141.40 MHz, 2142×1100 total); modo 2 = 48 Hz (113.12 MHz).
+  6 bits por color por DisplayPort, así que a 75 Hz (176.72 MHz) le sobra ancho de banda.
+- `pantalla/pantalla-hz.sh N` (sudo): override en `/Library/Displays/Contents/Resources/Overrides/DisplayVendorID-9e5/DisplayProductID-6b3`. Cambia el 2.º descriptor (48 Hz) por N Hz con el mismo blanking y corrige el checksum; 60 Hz sigue de principal. `quitar` lo borra. Probado sin instalar: 75.00 Hz exactos.
+- **PantallaHz** (`~/.local/bin/PantallaHz`): pone el modo de más Hz del panel y abre una ventana de confirmación con cuenta regresiva de 30 s **en todas las pantallas**; si no se confirma, regresa al modo anterior. `PantallaHz 60` regresa sin preguntar. Sin el override hoy ve 48 y 60 Hz.
+- **TeclaWindows:** si el brillo ya está al mínimo (DisplayServicesGetBrightness ≤ 0.02) y se aprieta bajar brillo, desactiva el panel interno (SLSConfigureDisplayEnabled, solo esta sesión) si hay otra pantalla; si no la hay, `pmset displaysleepnow`. Subir brillo lo prende.
+  - Seguridades: al arrancar prende un panel que haya quedado apagado; si se desconecta la otra pantalla, prende el panel.
+  - Escucha NX_SYSDEFINED (subtipo 8, teclas 2/3) y las teclas ADB 144/145.
+  - Al recompilarla (firma ad-hoc nueva) macOS le quitó el permiso de Monitoreo de entrada: hay que volver a darlo.
+- GitHub commit 471f0e4 (BateriaT470p, LuzTeclado, PantallaHz, TeclaWindows, fondo 14"). Copia de Windows actualizada.
+
+### 2026-11-21 04:25 - Override de pantalla a 75 Hz
+- `/Library/Displays/Contents/Resources/Overrides/DisplayVendorID-9e5/DisplayProductID-6b3` con el 2o descriptor del EDID cambiado a 75 Hz (antes 48 Hz). 60 Hz sigue de principal.
+- Probar con `PantallaHz` (confirma en 30 s o regresa a 60). Quitar: `sudo bash ~/hackintosh-mac/pantalla/pantalla-hz.sh quitar` y reiniciar.
+
+### 2026-11-21 04:25 - Menú EN VIVO y Diagnóstico grabados en EFI-MAC
+- OpenCanopy.efi con panel EN VIVO (176128 bytes), Tools/DiagT470p.efi (94208 bytes) con entrada "Diagnostico" en Misc/Tools y fondo corregido.
+- Respaldo de lo anterior: `BITACORA-MAC/respaldos/menu-vivo-antes-20261121-042511/` (OpenCanopy.efi, config.plist, Background.icns) y en ~/hackintosh-mac/respaldos/.
+- ocvalidate: Completed validating /Volumes/EFI-MAC/EFI/OC/config.plist in 2 ms. No issues found.
+- **Si el menú se traba o no arranca:** F12 → USB de OpenCore, y desde macOS `sudo bash ~/hackintosh-mac/menu-arranque/instalar-en-efi.sh revertir`.
+  Desde Windows: copiar `menu-vivo-antes-20261121-042511/OpenCanopy.efi` a EFI\OC\Drivers\ y su config.plist a EFI\OC\.
+
+### 2026-11-21 05:00 - Panel confirmado a 75 Hz; preparado lo de la TV
+- **Panel a 75 Hz:** el override instalado expone 60 y 75 Hz y Andrew confirmó en la ventana de PantallaHz ("Confirmado: el panel se queda a 75 Hz").
+  Un error mío regresó el panel a 60 Hz un momento; se volvió a poner con la confirmación de 30 s.
+- **TV (HDMI):** Insignia/Best Buy "LCDTV" 2016, VendorID 0x859, ProductID 0x19. Nativa 1360×768 a 60.02 Hz (85.50 MHz). Acepta hasta 1080p60 (lo reduce).
+  Declara 55–76 Hz verticales, 30–80 kHz horizontales y 170 MHz de reloj máximo. La extensión CEA anuncia YCbCr 4:4:4/4:2:2 (byte 3 = 0x73), y por eso macOS manda YCbCr (texto borroso, colores deslavados).
+- `pantalla/tv-pantalla.sh rgb|N|quitar` (sudo): override `DisplayVendorID-859/DisplayProductID-19`. Quita YCbCr (0x73 → 0x43) para forzar RGB y, con N, pone 1360×768 a N Hz en el 2.º descriptor (75 Hz = 106.85 MHz, 59.6 kHz, dentro de los límites).
+  Corrige los dos checksums. No hace falta reiniciar: basta con reconectar el HDMI. Probado sin instalar.
+- PantallaHz: `PantallaHz tv` y `PantallaHz tv 60` hacen lo mismo con la pantalla externa.
+- Límite del panel: el "margen de 15 Hz" es un promedio, no una regla. Se puede seguir probando 80/85 Hz con reinicio + confirmación, revisando que no se salte cuadros (testufo.com/frameskipping).
+
+### 2026-11-21 04:35 - Override de la TV (75)
+- `/Library/Displays/Contents/Resources/Overrides/DisplayVendorID-859/DisplayProductID-19`: sin YCbCr en el EDID (macOS manda RGB) + 1360x768 a 75 Hz como 2o modo.
+- Quitar: `sudo bash ~/hackintosh-mac/pantalla/tv-pantalla.sh quitar` y reconectar el HDMI.
+
+### 2026-11-21 05:15 - Las dos pantallas a 75 Hz, Arduino IDE con ESP32-S3 y eqMac
+- **Pantallas:** laptop 1920×1080 a 75 Hz y TV 1360×768 a 75 Hz (con override RGB), confirmadas por Andrew.
+  macOS las guardó en `~/Library/Preferences/ByHost/com.apple.windowserver.<UUID>.plist` (RefreshRate 75), así que se quedan al reiniciar. Andrew decide dejarlas en 75 (no subir más).
+- **Arduino IDE 2.3.11** (notarizado por Arduino SA) en /Applications. `arduino-cli` 1.6.0 del IDE enlazado en `~/.local/bin`, con configuración en `~/.arduinoIDE/arduino-cli.yaml` (URL de Espressif; datos en ~/Library/Arduino15, sketches en ~/Documents/Arduino).
+  - Núcleos: arduino:avr 1.8.8 (Uno) y esp32:esp32 4.0.0.
+  - Librerías (sacadas de las notas de Obsidian): LiquidCrystal I2C, DHT sensor library + Adafruit Unified Sensor, OneWire, DallasTemperature, Adafruit Motor Shield (V1 = AFMotor y V2), RTClib, TinyGPSPlus, Adafruit NeoPixel y Adafruit BusIO.
+  - Probado: compila un sketch para `esp32:esp32:esp32s3:PartitionScheme=app3M_fat9M_16MB,FlashSize=16M,PSRAM=opi,CDCOnBoot=cdc` (ESP32-S3 N16R8) y otro para `arduino:avr:uno`.
+- **eqMac 1.9.2** (notarizado por Bitgapp) en /Applications: ecualizador para todo el sistema. El Atmos/Audio Espacial real solo funciona con AirPods.

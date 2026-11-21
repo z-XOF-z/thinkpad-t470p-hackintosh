@@ -1,16 +1,21 @@
 // PantallaHz: cambia el panel interno al modo de mas Hz que tenga (1920x1080) y pide confirmar en 30 s.
 // La ventana de confirmacion sale en TODAS las pantallas (si el panel se queda negro, se ve en la tele).
 // Si no se confirma a tiempo, regresa solo al modo de antes.
-// Uso: PantallaHz            -> prueba el maximo disponible
+// Uso: PantallaHz            -> prueba el maximo disponible en el panel de la laptop
 //      PantallaHz 60         -> regresa a 60 Hz (sin preguntar)
+//      PantallaHz tv [60]    -> lo mismo, pero en la pantalla externa (la TV)
 import Cocoa
 import CoreGraphics
+
+var args = Array(CommandLine.arguments.dropFirst())
+let usarTV = args.first == "tv"
+if usarTV { args.removeFirst() }
 
 func panelInterno() -> CGDirectDisplayID? {
     var ids = [CGDirectDisplayID](repeating: 0, count: 8)
     var n: UInt32 = 0
     CGGetOnlineDisplayList(8, &ids, &n)
-    return ids.prefix(Int(n)).first { CGDisplayIsBuiltin($0) != 0 }
+    return ids.prefix(Int(n)).first { (CGDisplayIsBuiltin($0) != 0) != usarTV }
 }
 
 func modos(_ d: CGDirectDisplayID) -> [CGDisplayMode] {
@@ -26,13 +31,13 @@ func poner(_ d: CGDirectDisplayID, _ m: CGDisplayMode) -> Bool {
 }
 
 guard let panel = panelInterno(), let anterior = CGDisplayCopyDisplayMode(panel) else {
-    print("No encontre el panel interno"); exit(1)
+    print(usarTV ? "No hay pantalla externa conectada" : "No encontre el panel interno"); exit(1)
 }
 let actual = modos(panel).filter { $0.width == anterior.width && $0.height == anterior.height && $0.pixelWidth == anterior.pixelWidth }
 let hzLista = Set(actual.map { Int($0.refreshRate.rounded()) }).sorted()
 print("Modos de \(anterior.width)x\(anterior.height) en el panel: \(hzLista.map { "\($0) Hz" }.joined(separator: ", "))  (ahora: \(Int(anterior.refreshRate.rounded())) Hz)")
 
-if let pedido = CommandLine.arguments.dropFirst().first.flatMap(Int.init) {
+if let pedido = args.first.flatMap(Int.init) {
     guard let m = actual.first(where: { Int($0.refreshRate.rounded()) == pedido }) else { print("No hay modo de \(pedido) Hz"); exit(1) }
     print(poner(panel, m) ? "Listo: \(pedido) Hz" : "No se pudo cambiar")
     exit(0)
@@ -58,7 +63,7 @@ final class Confirmar: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
         for pantalla in NSScreen.screens {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 170), styleMask: [.titled], backing: .buffered, defer: false, screen: pantalla)
-            w.title = "Panel a \(hz) Hz"
+            w.title = (usarTV ? "TV" : "Panel") + " a \(hz) Hz"
             w.level = .screenSaver
             let v = w.contentView!
             let t = NSTextField(labelWithString: "")
@@ -83,7 +88,7 @@ final class Confirmar: NSObject, NSApplicationDelegate {
     }
 
     func actualizar() {
-        for t in etiquetas { t.stringValue = "El panel ya esta a \(hz) Hz. ¿Se ve bien?\nSi no confirmas, regresa a 60 Hz en \(restante) s." }
+        for t in etiquetas { t.stringValue = "\(usarTV ? "La TV" : "El panel") ya esta a \(hz) Hz. ¿Se ve bien?\nSi no confirmas, regresa a 60 Hz en \(restante) s." }
     }
 
     func tic() {
