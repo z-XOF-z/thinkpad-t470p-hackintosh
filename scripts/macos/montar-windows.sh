@@ -1,5 +1,5 @@
 #!/bin/bash
-# Monta el disco de Windows (NTFS) con LECTURA Y ESCRITURA usando ntfs-3g + macFUSE (backend FSKit, sin kext).
+# Monta el disco de Windows (NTFS) con LECTURA Y ESCRITURA usando ntfs-3g + macFUSE (kext). Espera a que el kext cargue.
 # Uso: sudo bash /usr/local/sbin/montar-windows.sh            (monta con escritura)
 #      sudo bash /usr/local/sbin/montar-windows.sh solo-leer  (regresa al modo normal de macOS, solo lectura)
 # Seguridad: ntfs-3g se niega a escribir si Windows quedó hibernado o con "inicio rápido". En ese caso
@@ -44,36 +44,46 @@ if montado_fuse; then
   fi
 fi
 
-# Quitar el montaje de solo lectura de macOS
-diskutil unmount "$DEV" >/dev/null 2>&1 || diskutil unmount force "$DEV" >/dev/null 2>&1
-mkdir -p "$MP"
+# Antes de montar: cargar el driver (kext) de macFUSE y esperar a que este listo.
+# Al arrancar, este script corre antes de que macOS cargue el kext; si se monta en ese momento,
+# el montaje se cae solo. (Ya NO se usa el respaldo FSKit: era el que sacaba el aviso de "activa la extension".)
+for i in $(seq 1 60); do
+  kextstat 2>/dev/null | grep -q 'io.macfuse.filesystems.macfuse' && break
+  [ -x /Library/Filesystems/macfuse.fs/Contents/Resources/load_macfuse ] && /Library/Filesystems/macfuse.fs/Contents/Resources/load_macfuse >/dev/null 2>&1
+  sleep 2
+done
+if ! kextstat 2>/dev/null | grep -q 'io.macfuse.filesystems.macfuse'; then
+  echo "El kext de macFUSE no cargo en 2 minutos."
+fi
+sleep 3
 
-OPTS="volname=Windows,uid=501,gid=20,umask=022,windows_names,big_writes"
-for BACKEND in vfs fskit; do   # vfs = kext de macFUSE (ya aprobado, mas rapido); fskit de respaldo
-  if [ "$BACKEND" = fskit ]; then O="$OPTS,backend=fskit"; else O="$OPTS,local,allow_other,auto_xattr"; fi
-  echo "Probando backend $BACKEND ..."
-  "$NTFS3G" "/dev/$DEV" "$MP" -o "$O" &
+OPTS="volname=Windows,uid=501,gid=20,umask=022,windows_names,big_writes,local,allow_other,auto_xattr"
+for INTENTO in 1 2 3 4 5; do
+  # Quitar el montaje de solo lectura de macOS
+  diskutil unmount "$DEV" >/dev/null 2>&1 || diskutil unmount force "$DEV" >/dev/null 2>&1
+  mkdir -p "$MP"
+  echo "Intento $INTENTO (kext de macFUSE) ..."
+  "$NTFS3G" "/dev/$DEV" "$MP" -o "$OPTS" &
   PID=$!
   OK=0
-  for i in $(seq 1 120); do     # esperar hasta 2 min (al arrancar el kext puede tardar)
+  for i in $(seq 1 60); do
     if montado_fuse; then OK=1; break; fi
     kill -0 $PID 2>/dev/null || { wait $PID; montado_fuse && OK=1; break; }
     sleep 1
   done
-  if [ $OK = 0 ]; then
-    echo "El backend $BACKEND no montó (se tardó o falló)."
-    kill $PID 2>/dev/null; pkill -f "ntfs-3g /dev/$DEV" 2>/dev/null; sleep 1; umount "$MP" 2>/dev/null
-  fi
   if [ $OK = 1 ]; then
-    sleep 1
-    if touch "$MP/.prueba-escritura-mac" 2>/dev/null && rm -f "$MP/.prueba-escritura-mac"; then
+    sleep 2
+    if montado_fuse && touch "$MP/.prueba-escritura-mac" 2>/dev/null && rm -f "$MP/.prueba-escritura-mac"; then
       mdutil -i off "$MP" >/dev/null 2>&1 || true   # que Spotlight no indexe ni escriba en el disco de Windows
-      echo "LISTO: $MP montado con escritura (ntfs-3g, backend $BACKEND)."
+      echo "LISTO: $MP montado con escritura (ntfs-3g, intento $INTENTO)."
       exit 0
     fi
-    echo "Montó pero no deja escribir; lo desmonto."
-    umount "$MP" 2>/dev/null
+    echo "Monto pero no deja escribir o se cayo."
+  else
+    echo "No monto."
   fi
+  kill $PID 2>/dev/null; pkill -f "ntfs-3g /dev/$DEV" 2>/dev/null; sleep 1; umount "$MP" 2>/dev/null
+  sleep 10
 done
 
 echo "No se pudo montar con escritura. Regreso al modo solo lectura."
@@ -81,6 +91,6 @@ echo "No se pudo montar con escritura. Regreso al modo solo lectura."
 pkill -f "ntfs-3g /dev/$DEV" 2>/dev/null; sleep 1
 while mount | grep -q " on $MP ("; do umount "$MP" 2>/dev/null || break; done
 echo "Causas típicas: Windows hibernado o con inicio rápido (apágalo bien desde Windows),"
-echo "o falta activar macFUSE en Ajustes > General > Ítems de inicio y extensiones > Extensiones del sistema de archivos."
+echo "o el kext de macFUSE no esta permitido (Ajustes > Privacidad y seguridad)."
 diskutil mount "$DEV" >/dev/null 2>&1
 exit 1

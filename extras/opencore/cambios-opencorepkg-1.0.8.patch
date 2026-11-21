@@ -1,0 +1,82 @@
+diff --git a/OpenCorePkg.dsc b/OpenCorePkg.dsc
+index 33a51de..e373d34 100755
+--- a/OpenCorePkg.dsc
++++ b/OpenCorePkg.dsc
+@@ -218,6 +218,7 @@
+   OpenCorePkg/Application/ChipTune/ChipTune.inf
+   OpenCorePkg/Application/CleanNvram/CleanNvram.inf
+   OpenCorePkg/Application/CsrUtil/CsrUtil.inf
++  OpenCorePkg/Application/DiagT470p/DiagT470p.inf
+   OpenCorePkg/Application/FontTester/FontTester.inf
+   OpenCorePkg/Application/GopPerf/GopPerf.inf
+   OpenCorePkg/Application/GopStop/GopStop.inf
+diff --git a/Platform/OpenCanopy/OpenCanopy.inf b/Platform/OpenCanopy/OpenCanopy.inf
+index 7159d22..cf9eee2 100644
+--- a/Platform/OpenCanopy/OpenCanopy.inf
++++ b/Platform/OpenCanopy/OpenCanopy.inf
+@@ -43,6 +43,8 @@
+   Output/OutputStGop.c
+   Views/Common.c
+   Views/BootPicker.c
++  Views/LiveStats.c
++  Views/LiveStats.h
+   Views/Password.c
+ 
+ [Packages]
+@@ -82,3 +84,7 @@
+   UefiBootServicesTableLib
+   UefiDriverEntryPoint
+   OcAppleEventLib
++  OcCpuLib
++  PrintLib
++  IoLib
++  UefiRuntimeServicesTableLib
+diff --git a/Platform/OpenCanopy/Views/BootPicker.c b/Platform/OpenCanopy/Views/BootPicker.c
+index 0804cd5..f2f7da3 100644
+--- a/Platform/OpenCanopy/Views/BootPicker.c
++++ b/Platform/OpenCanopy/Views/BootPicker.c
+@@ -26,6 +26,7 @@
+ #include "../GuiApp.h"
+ #include "../GuiIo.h"
+ #include "BootPicker.h"
++#include "LiveStats.h"
+ 
+ #include "Common.h"
+ #include "../Blending.h"
+@@ -1318,14 +1319,16 @@ STATIC GUI_OBJ_CHILD  *mBootPickerViewChildren[] = {
+   &mCommonActionButtonsContainer,
+   &mBootPickerLeftScroll.Hdr,
+   &mBootPickerRightScroll.Hdr,
+-  &mBootPickerVersionLabel
++  &mBootPickerVersionLabel,
++  &mLiveStatsPanel
+ };
+ 
+ STATIC GUI_OBJ_CHILD  *mBootPickerViewChildrenMinimal[] = {
+   &mBootPickerContainer,
+   &mBootPickerLeftScroll.Hdr,
+   &mBootPickerRightScroll.Hdr,
+-  &mBootPickerVersionLabel
++  &mBootPickerVersionLabel,
++  &mLiveStatsPanel
+ };
+ 
+ GLOBAL_REMOVE_IF_UNREFERENCED GUI_VIEW_CONTEXT  mBootPickerViewContext = {
+@@ -2128,6 +2131,8 @@ BootPickerViewLateInitialize (
+   BootEntry = InternalGetVolumeEntry (DefaultIndex);
+   InternalStartAnimateLabel (DrawContext, BootEntry);
+   GuiContext->BootEntry = BootEntry->Context;
++
++  LiveStatsInitialize (DrawContext, GuiContext);
+ }
+ 
+ VOID
+@@ -2138,6 +2143,8 @@ BootPickerViewDeinitialize (
+ {
+   UINT32  Index;
+ 
++  LiveStatsDeinitialize (DrawContext);
++
+   if (mVersionLabelImage.Buffer != NULL) {
+     FreePool (mVersionLabelImage.Buffer);
+     mVersionLabelImage.Buffer = NULL;

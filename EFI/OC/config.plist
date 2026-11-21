@@ -1504,6 +1504,28 @@
 				<key>TextMode</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>Arguments</key>
+				<string></string>
+				<key>Auxiliary</key>
+				<false/>
+				<key>Comment</key>
+				<string>Diagnostico propio: RAM, discos, teclado, pantalla, bateria</string>
+				<key>Enabled</key>
+				<true/>
+				<key>Flavour</key>
+				<string>Diagnostico:Tool</string>
+				<key>FullNvramAccess</key>
+				<false/>
+				<key>Name</key>
+				<string>Diagnostico</string>
+				<key>Path</key>
+				<string>DiagT470p.efi</string>
+				<key>RealPath</key>
+				<false/>
+				<key>TextMode</key>
+				<false/>
+			</dict>
 		</array>
 	</dict>
 	<key>NVRAM</key>

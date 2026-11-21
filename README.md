@@ -68,6 +68,7 @@ Al terminar tienes la carpeta `USB-T470p/` con `EFI/` y `com.apple.recovery.boot
 | Suspensión | ✅ | `hibernatemode 0` |
 | AirDrop iPhone → Mac, Handoff | ❌ | el chip Intel no tiene AWDL; necesita Broadcom BCM94360NG |
 | Lector de huella | ❌ | sin driver |
+| Disco de Windows al arrancar | ✅ sin avisos | `montar-windows.sh` espera a que cargue el kext de macFUSE |
 | Ethernet | 🔧 en revisión | IntelMausi carga, sin enlace todavía |
 
 ## 🗂️ Qué hay en este repo
@@ -81,14 +82,42 @@ docs/
   bitacora.md            todo lo que se hizo, con fechas, respaldos y cómo deshacer cada cambio
   windows.md             lo que se hizo desde Windows (particiones, USB, mapa USB)
 scripts/macos/           scripts usados en macOS (WiFi, audio, montaje NTFS, menú, teclado...)
-extras/                  SSDT-ECRW, fondo del menú, distribución de teclado latinoamericana, TeclaWindows
+extras/                  SSDT-ECRW, fondo del menú, teclado latinoamericano, TeclaWindows,
+                         y extras/opencore/: código del panel EN VIVO y de la herramienta Diagnóstico
 ```
 
-## 🎨 Menú de arranque
+## 🎨 Menú de arranque con datos EN VIVO
 
-Tema GoldenGate de OpenCanopy con fondo propio (`EFI/OC/Resources/Image/Acidanthera/GoldenGate/Background.icns`).
-El fondo se genera con [`extras/menu-arranque/fondo.swift`](extras/menu-arranque/fondo.swift).
-En desarrollo: panel **EN VIVO** dentro del menú con temperatura, frecuencia y consumo del CPU en tiempo real.
+Tema GoldenGate de OpenCanopy con fondo propio ([`fondo.swift`](extras/menu-arranque/fondo.swift)) y un **OpenCanopy modificado**
+que dibuja, debajo de los iconos, un panel que se actualiza dos veces por segundo:
+
+| Tarjeta | De dónde sale |
+|---|---|
+| Temperatura del CPU | MSR `IA32_PACKAGE_THERM_STATUS` (0x1B1) y TjMax (0x1A2) |
+| Frecuencia real | `APERF/MPERF` × frecuencia del TSC |
+| Consumo del CPU | RAPL `MSR_PKG_ENERGY_STATUS` (0x611) |
+| Batería (%, carga/uso, W) | EC de la ThinkPad: `SBRC/SBFC/SBAC/SBVO` (offsets del DSDT de la T470p) |
+| Ventilador (RPM) | EC `HSPD` (0x84) |
+| Temperatura de la placa | EC `TMP0` (0x78) |
+
+Cada tarjeta tiene su gráfica de los últimos 60 s, más RAM total y reloj. Usa una fuente suavizada propia
+([`LiveFont.h`](extras/opencore/OpenCanopy-vivo/LiveFont.h), generada con [`generar-fuente.swift`](extras/opencore/OpenCanopy-vivo/generar-fuente.swift)).
+Cada MSR se lee solo si CPUID dice que existe; si el EC no responde, la tarjeta muestra `--`.
+
+## 🩺 Herramienta "Diagnóstico" (en el mismo menú)
+
+App UEFI propia ([`extras/opencore/DiagT470p`](extras/opencore/DiagT470p)) que aparece como una opción más del menú de OpenCore:
+
+- **Resumen:** CPU, microcódigo, firmware y mapa de toda la RAM por colores.
+- **Prueba de RAM:** toda la memoria libre con 4 patrones y un mapa de cuadros que se va llenando.
+- **Discos – S.M.A.R.T.:** salud, horas, temperatura, vida del SSD y atributos en español.
+- **Discos – pruebas** (solo leen, cualquier disco): lectura lineal, **ATA VERIFY**, mariposa y acceso aleatorio, con mapa de latencias estilo Victoria.
+- **Discos – reparación** (**solo discos USB externos**): remap de sectores malos, refrescar lentos, leer-escribir-leer, escribir patrón y verificar, y borrar.
+  El disco interno y la USB de arranque nunca aparecen; los métodos destructivos piden escribir `BORRAR`.
+- **Teclado** en pantalla, **pantalla** (pixeles muertos), **batería** (salud, ciclos, historial) y **BIOS y ThinkPad** (orden de arranque, ventilador, reiniciar a la BIOS).
+
+Los cambios a OpenCorePkg 1.0.8 están en [`cambios-opencorepkg-1.0.8.patch`](extras/opencore/cambios-opencorepkg-1.0.8.patch).
+Los `.efi` compilados (EDK2, XCODE5, RELEASE) vienen en `extras/opencore/compilados/` y ya están en `EFI/`.
 
 ## ⚠️ Antes de empezar
 

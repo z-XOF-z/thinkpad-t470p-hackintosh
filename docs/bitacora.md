@@ -456,3 +456,92 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
   - Falta la EFI: `sudo bash ~/hackintosh-mac/exportar-efi.sh` (solo lee EFI-MAC) y luego login de GitHub (`gh auth login --web`).
 - **Hora de Windows:** `hora-UTC-como-macOS.reg` copiado al Escritorio de Windows. Falta darle doble clic desde Windows.
 - **Obsidian (bóveda XOF en CODE):** nota nueva `proyectos/hackintosh-t470p.md` (plantilla de proyecto) y fila en la tabla de proyectos de `inicio.md`.
+
+### 2026-11-21 03:08 - GitHub publicado, USB al día y panel EN VIVO v2
+- **GitHub:** sesión iniciada como `z-XOF-z`. Repo público https://github.com/z-XOF-z/thinkpad-t470p-hackintosh (commits b33e2dd y a535b8c), con temas hackintosh/opencore/thinkpad/t470p/macos-tahoe.
+  Commits con el correo noreply de GitHub. El instalador se probó desde GitHub (`curl ... | python3 - --sin-macos`): bajó la EFI del repo y generó un SMBIOS nuevo.
+  Clonado en Windows: `CODE/thinkpad-t470p-hackintosh` (core.fileMode false). Enlace agregado a la nota de Obsidian.
+- **USB OPENCORE (disk6s1):** tenía la EFI vieja del 17/11 (sin AMFIPass ni el SIP nuevo; arrancar macOS con ella podía fallar). Respaldo en `respaldos/usb-EFI-antes-20261121-030102/`.
+  Se reemplazó por la EFI actual de EFI-MAC + el fondo corregido + el OpenCanopy con panel EN VIVO. ocvalidate sin errores; Timeout 0.
+- **Panel EN VIVO v2** (`LiveStats.c`): 6 tarjetas en una fila centrada (1302×224, y 668–892 en 1080p), entre los iconos (terminan en ~659) y los botones de apagar/reiniciar (empiezan en 900).
+  Se agregaron **batería** (%, cargando/en uso y watts), **ventilador** (RPM) y **temperatura de la placa**, leídos del EC por los puertos 0x62/0x66 con tiempo límite (20 ms por paso). Offsets del DSDT: HB0S 0x38, TMP0 0x78, HIID 0x81 (se pone 0 = BAT0, como _BST), HSPD 0x84, SBRC 0xA0, SBFC 0xA2, SBAC 0xA8, SBVO 0xAA.
+  Arriba: RAM total (suma del mapa de memoria de UEFI) y reloj. Si el panel no cabe sin tapar los iconos, no se muestra. Copia de la v1 en `opencanopy-vivo/LiveStats.c.v1`.
+- **Para probar:** reiniciar → F12 → la USB. Si el menú se traba o se ve mal: apagar con el botón y arrancar normal (EFI-MAC no se tocó).
+
+### 2026-11-21 03:20 - Herramienta propia "Diagnostico" (DiagT470p.efi) en la USB
+- App UEFI propia, `opencanopy-vivo/OpenCorePkg/Application/DiagT470p/` (Comun.c, Main.c, Sistema.c, Ram.c, Disco.c), compilada con EDK2 (XCODE5, RELEASE): `DiagT470p.efi`, 77 824 bytes, sin errores.
+  Agregada a OpenCorePkg.dsc. Usa la consola de texto de OpenCore (OcConsoleControlEntryModeGenericLib) + GOP para gráficas.
+- **Todo es de solo lectura** (no escribe en discos). Menú:
+  1. Resumen: CPU (CPUID, microcódigo MSR 0x8B), firmware, GOP, reloj y mapa de memoria UEFI (por tipo + barra física coloreada).
+  2. Prueba de RAM: toda la memoria libre en bloques de 16 MB (AllocatePages AllocateAddress → 4 patrones: 0x55, 0xAA, dirección en dirección, aleatorio xorshift → FreePages).
+     Mapa de 96×20 cuadros (gris pendiente / amarillo / verde / rojo / negro en uso), barras de MB/s, lista de errores y pasadas continuas hasta Esc.
+  3. Discos: info y S.M.A.R.T. por EFI_ATA_PASS_THRU: IDENTIFY 0xEC, SMART READ DATA (0xB0/0xD0), THRESHOLDS (0xD1) y RETURN STATUS (0xDA).
+     Tabla de atributos con nombres en español, barras y veredicto (BUENA / REVISAR / MALA), horas, temperatura y vida restante del SSD.
+  4. Escaneo de superficie (estilo Victoria): BlockIo ReadBlocks de 256 sectores; cada lectura se clasifica <5, <20, <50, <150, <500, ≥500 ms o error.
+     Mapa de 150×26 cuadros (cada cuadro = su peor lectura), contadores, MB/s con gráfica y lista de LBA con error. Elige el disco (interno/extraíble).
+  5. Teclado: teclado latinoamericano de la T470p en pantalla. El firmware lo lee como EE.UU. (la Ñ llega como `;`), por eso la tabla usa el carácter de EE.UU. de cada tecla. Esc 3 veces para salir.
+  6. Pantalla: 8 colores sólidos, degradado y tablero fino.
+  7. Batería (EC): %, cargando/en uso, mWh o mAh (bit 15 de SBBM), voltaje, corriente, watts, salud (SBFC/SBDC), ciclos (SBCC), fecha de fabricación (SBMD), historial en barras, TMP0 y RPM.
+- En la USB: `EFI/OC/Tools/DiagT470p.efi` + entrada en Misc/Tools ("Diagnostico", Flavour `Diagnostico:Tool`, Auxiliary false: se ve sin apretar Espacio). ocvalidate sin errores. Respaldo del config de la USB en `respaldos/usb-config.antes-diag-*`.
+- Siguiente etapa (no hecha): reparación estilo HDAT2/Victoria solo para discos externos, con confirmaciones. Lectura/verificación + reasignación (escribir el sector malo) + borrado seguro ATA. El disco interno quedaría bloqueado.
+- No se hizo ingeniería inversa de HDAT2 ni de Victoria: todo sale de los estándares públicos ATA/ACS y UEFI. No hay desfragmentador (en SSD no conviene y requiere entender NTFS/APFS).
+
+### 2026-11-21 03:32 - Prueba en la laptop: funciona. Arreglos de calidad y de limpieza
+- **Andrew probó la USB:** el panel EN VIVO y el Diagnóstico funcionan.
+- Problema 1: el panel se veía "de baja calidad". Causa: los números grandes eran la fuente de 12 px de OpenCanopy agrandada ×3 pixel por pixel.
+  Arreglo: fuente propia **suavizada** (alfa de 8 bits) generada con `opencanopy-vivo/generar-fuente.swift` (Helvetica Neue) → `Views/LiveFont.h`, en tres tamaños: Grande 48 px (valores), Mediano 23 px (EN VIVO, reloj, unidades), Chico 17 px (títulos, RAM). El reloj ahora se alinea a la derecha midiendo el texto. OpenCanopy.efi: 176 128 bytes.
+- Problema 2: en el Diagnóstico, al cambiar de sección quedaban las gráficas de la anterior (por ejemplo, la RAM debajo del disco). Causa: `ClearScreen` de OpenCore solo borra el texto. Arreglo: `Limpiar()` ahora también pinta toda la pantalla de negro por GOP.
+- Ambos recompilados sin errores y copiados a la USB.
+
+### 2026-11-21 03:40 - Correcciones por las fotos y modo de reparación (estilo HDAT2/Victoria)
+- **Fotos de Andrew (primera versión):** todo funciona. Panel: 52 °C, 3.09 GHz, 6.4 W, batería 100 %, 2158 RPM, placa 52 °C. RAM a ~3.4 GB/s sin errores.
+  S.M.A.R.T. del Kingston SA400S37480G (firmware SBFKK1C3): salud BUENA, 3384 h, 2154 encendidos, 39 °C, vida 94 %. Teclado 75/75. Escaneo: ~250 MB/s, sin errores. Batería: 93.2 %, 215 ciclos, diseño 71 280 mWh a 10.8 V.
+- **Errores corregidos en DiagT470p:**
+  - Decía "8 núcleos / 16 hilos": CPUID 1/4 dan el máximo del APIC. Ahora usa CPUID 0x0B (topología real: 4/4).
+  - "RAM 17.0 GB": eran 16 GiB en decimal. La RAM ahora se muestra en binario (TamanoBin) y solo cuenta tipos de memoria estándar.
+  - Temperatura del S.M.A.R.T. con crudo 81608966183: solo se usa el byte bajo (los otros son mínimo y máximo).
+  - Barras del S.M.A.R.T. escaladas a 100 (o 253) y la de vida restante en verde/amarillo/rojo.
+  - "Fabricada 1980-00-16": se prueba SBMD y SBOM (página 2) y la fecha solo se muestra si el año está entre 2010 y 2035.
+- **Opción 5 nueva: "Discos: reparación"** (DiagT470p.efi 86 016 bytes):
+  1. Remap: lee todo; el sector que no se lee en 3 intentos se escribe en ceros (el disco lo reasigna) y se verifica.
+  2. Refrescar: los bloques de 150 ms o más se reescriben con sus mismos datos.
+  3. Borrar todo con ceros (hay que escribir `BORRAR`).
+  - **Candados:** solo discos con nodo USB en la ruta, que no sean la USB de arranque (`EsDiscoDeArranque` compara con el LoadedImage; si no sabe, bloquea) y que no sean de solo lectura. Doble confirmación para 1 y 2. `Escanear()` vuelve a revisar el candado antes de escribir. El disco interno SATA nunca aparece.
+- Copiado a la USB.
+
+### 2026-11-21 03:46 - Diagnóstico con 9 métodos de disco (estilo HDAT2/Victoria) y franjas en la interfaz
+- `Disco.c` reescrito con un solo motor (`Ejecutar`) y 9 métodos:
+  - **Solo leen (cualquier disco):** 1 Lectura lineal · 2 Verificar con **ATA READ VERIFY SECTORS EXT (0x42)**, sin transferir datos (solo SATA con EFI_ATA_PASS_THRU; el disco se enlaza con su puerto por el nodo `Sata()` de la ruta y LocateDevicePath; si no hay ATA usa lectura) · 3 Mariposa (alterna inicio y final) · 4 Acceso aleatorio (4096 lecturas: tiempo mínimo, promedio y máximo).
+  - **Escriben (solo USB externos que no sean de arranque):** 5 Reparar (remap) · 6 Refrescar lentos (≥150 ms) · 7 Leer-escribir-leer (reescribe igual y compara, no destructivo) · 8 Escribir patrón y verificar (xorshift distinto por LBA, destructivo) · 9 Borrar con ceros.
+  - Confirmaciones: los no destructivos que escriben piden doble S; los destructivos piden escribir `BORRAR`. El candado (`PuedeEscribir`) se revisa en el menú y otra vez dentro de `Ejecutar`.
+  - Mapa de 150×26 que guarda la **peor** operación de cada zona (sirve para métodos que saltan). Gráfica de velocidad con líneas guía y brillo en cada barra.
+- Menú principal: "Discos: pruebas" (cualquier disco, solo los métodos de lectura) y "Discos: reparación" (solo USB, los 9 métodos).
+- Encabezado con 6 franjas diagonales rojas, cada vez más oscuras ("rayitos").
+- DiagT470p.efi 90 112 bytes, compilado sin errores, copiado a la USB.
+- Para pasar todo a EFI-MAC cuando Andrew lo apruebe: `sudo bash ~/hackintosh-mac/menu-arranque/instalar-en-efi.sh` (respalda OpenCanopy.efi, config.plist y fondo; `revertir` los regresa).
+
+### 2026-11-21 03:48 - Diagnóstico: pantalla "BIOS y ThinkPad" (opción 9)
+- Pregunta de Andrew: ¿se puede controlar la BIOS desde el menú? Decisión: **no se edita la configuración de la BIOS desde UEFI** (variable Setup de Lenovo): un valor mal puesto puede dejar la ThinkPad sin arrancar.
+  La vía segura para cambiar opciones de la BIOS es la interfaz WMI oficial de Lenovo en Windows (ofrecida como herramienta aparte, no hecha).
+- Opción 9 nueva en DiagT470p (94 208 bytes, sin errores, en la USB):
+  - Firmware (proveedor, revisión, UEFI), Secure Boot y SetupMode, y la lista BootOrder/Boot#### con la entrada desde la que se arrancó (BootCurrent).
+    El SMBIOS no sirve aquí: OpenCore lo reemplaza con el de Mac (`UpdateSMBIOS` = true, modo `Create`).
+  - **Reiniciar a la BIOS** con la tecla B (bit EFI_OS_INDICATIONS_BOOT_TO_FW_UI en OsIndications + ResetSystem), solo si OsIndicationsSupported lo ofrece. Pide confirmación.
+  - **Ventilador** por el EC (HFSP 0x2F): A = automático (0x80), F = full (0x40), 1–7 = nivel fijo, con RPM en vivo (HSPD 0x84) y barra. Dura hasta que arranca el sistema.
+
+### 2026-11-21 03:53 - Menú EN VIVO y Diagnóstico grabados en EFI-MAC
+- OpenCanopy.efi con panel EN VIVO (176128 bytes), Tools/DiagT470p.efi (94208 bytes) con entrada "Diagnostico" en Misc/Tools y fondo corregido.
+- Respaldo de lo anterior: `BITACORA-MAC/respaldos/menu-vivo-antes-20261121-035318/` (OpenCanopy.efi, config.plist, Background.icns) y en ~/hackintosh-mac/respaldos/.
+- ocvalidate: Completed validating /Volumes/EFI-MAC/EFI/OC/config.plist in 8 ms. No issues found.
+- **Si el menú se traba o no arranca:** F12 → USB de OpenCore, y desde macOS `sudo bash ~/hackintosh-mac/menu-arranque/instalar-en-efi.sh revertir`.
+  Desde Windows: copiar `menu-vivo-antes-20261121-035318/OpenCanopy.efi` a EFI\OC\Drivers\ y su config.plist a EFI\OC\.
+
+### 2026-11-21 03:58 - Menú EN VIVO grabado en EFI-MAC; arreglo del aviso de macFUSE al arrancar
+- Andrew corrió `instalar-en-efi.sh`: el menú EN VIVO y el Diagnóstico ya arrancan desde el disco. "Se ve excelente".
+- **Aviso de "activa la extensión" en la pantalla de bloqueo:** el registro de las 03:51 muestra que ntfs-3g montó con escritura a las 03:51:55, pero el kext de macFUSE apenas se cargó a las 03:51:56 y el montaje se cayó solo (03:51:57).
+  Luego el script probó FSKit, que es el que pide activar la extensión del sistema de archivos. No era que estuviera apagado: el LaunchDaemon corre antes de que macOS cargue el kext.
+- `montar-windows.sh` cambiado:
+  - Primero carga el kext (`macfuse.fs/Contents/Resources/load_macfuse`) y espera hasta 2 min a verlo en kextstat.
+  - Luego monta solo con el kext: hasta 5 intentos, cada uno espera 60 s y entre intentos hay 10 s.
+  - **Se quitó el respaldo FSKit** (era el que sacaba el aviso).
+- Hay que reinstalarlo en /usr/local/sbin (necesita sudo).
