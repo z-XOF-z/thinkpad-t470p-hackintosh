@@ -71,6 +71,18 @@ Al terminar tienes la carpeta `USB-T470p/` con `EFI/` y `com.apple.recovery.boot
 | Disco de Windows al arrancar | ✅ sin avisos | `montar-windows.sh` espera a que cargue el kext de macFUSE |
 | Ethernet | 🔧 en revisión | IntelMausi carga, sin enlace todavía |
 
+## 🧰 Utilidades propias para macOS
+
+| Programa | Qué hace |
+|---|---|
+| **BateriaT470p** (barra de menús) | Límite de carga 60/80/90/100 % (BIOS: BCCS/BCSS), pausar la carga, **Fn Lock**, punto rojo de la tapa (prendido/apagado/parpadeo) y luz del teclado que respira |
+| **LuzTeclado** | Respiración de la luz del teclado (rápida, media, lenta) con candado de una sola instancia |
+| **TeclaWindows** | Tecla Windows sola abre Apps; con el brillo al mínimo, "bajar brillo" **apaga el panel** de verdad y "subir brillo" lo prende |
+| **PantallaHz** + `pantalla-hz.sh` | Agrega un modo de **75 Hz** al panel (override del EDID) y lo prueba con confirmación de 30 s en todas las pantallas (si no confirmas, regresa a 60 Hz) |
+
+> Aprendido: en la T470p cada cambio de la luz del teclado por software genera el mismo evento ACPI (0x1012) que Fn + Espacio.
+> Por eso la respiración no se engancha a esa tecla (se creaba un bucle).
+
 ## 🗂️ Qué hay en este repo
 
 ```

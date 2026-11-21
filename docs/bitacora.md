@@ -545,3 +545,55 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
   - Luego monta solo con el kext: hasta 5 intentos, cada uno espera 60 s y entre intentos hay 10 s.
   - **Se quitó el respaldo FSKit** (era el que sacaba el aviso).
 - Hay que reinstalarlo en /usr/local/sbin (necesita sudo).
+
+### 2026-11-21 04:05 - Windows montado sin avisos; GitHub y Obsidian al día
+- `montar-windows.sh` nuevo instalado: "LISTO … montado con escritura (ntfs-3g, intento 1)".
+- GitHub (commit bcdcfe8): EFI del repo con OpenCanopy EN VIVO + DiagT470p (entrada en Misc/Tools) + fondo corregido, ocvalidate sin errores.
+  `extras/opencore/`: código de LiveStats/LiveFont, generar-fuente.swift, DiagT470p y el parche de OpenCorePkg 1.0.8. README con las secciones del panel y del Diagnóstico.
+  Copia de Windows (`CODE/thinkpad-t470p-hackintosh`) actualizada con git pull.
+- Nota de Obsidian `proyectos/hackintosh-t470p.md` actualizada: decisiones del 21/11 y pendientes.
+
+### 2026-11-21 04:05 - Luz del teclado que "respira" (4.º estado de Fn + Espacio) y dudas del panel de YogaSMC
+- **Prueba:** la luz del teclado se puede cambiar desde macOS escribiendo la propiedad `BacklightLevel` del servicio ThinkVPC (YogaSMC → método `MLCS` del DSDT → `KBLS`). Niveles 0/1/2 OK; YogaSMCNC no recibió eventos de esos cambios.
+- **LuzTeclado** (`~/hackintosh-mac/luz-teclado/main.swift` → `~/.local/bin/LuzTeclado`, firmado ad-hoc):
+  - `ciclo`: lo llama YogaSMCNC con el evento 0x1012 (Fn + Espacio). Si estaba respirando, la detiene y apaga la luz. Si el EC acaba de pasar de alta a apagada, arranca `respirar` en segundo plano.
+  - `respirar`: repite 0,1,2,2,1,0,0 cada 360 ms (unos 2.5 s por respiro); guarda su PID en `~/Library/Application Support/LuzTeclado/`.
+  - `parar`: detiene la respiración y apaga la luz.
+  - Ciclo resultante: apagada → baja → alta → **respirando** → apagada.
+- YogaSMCNC: `Events > 1012 > 0` = acción `script` con `do shell script "~/.local/bin/LuzTeclado ciclo &"` (antes mostraba el aviso de nivel). La estrella (1311) sigue abriendo VS Code.
+  - Para deshacer: borrar `Events > 1012` en `org.zhen.YogaSMC` (o poner la acción `backlight`) y reiniciar YogaSMCNC.
+- **Dudas del panel de YogaSMC:**
+  - Quiet / Balanced / Performance y "DYTC Revision" = Lenovo Dynamic Thermal Control (perfiles térmicos de la BIOS). El DSDT de la T470p **no tiene método DYTC** (llegó en ThinkPads de 2018+), por eso la revisión sale en 0 y el control está gris.
+    El equivalente aquí es CPUFriend (rendimiento) + el ventilador.
+  - LED Control: el método `LED` del DSDT escribe en el EC (0x0C) y controla los LEDs físicos (botón de encendido, standby, el punto rojo de la "i" de la tapa) en apagado / prendido / parpadeo. "Mute LED fixup" sincroniza el LED de F1 con el silencio de macOS.
+  - El DSDT **sí** tiene BCTG/BCCS/BCSS: se pueden poner **umbrales de carga** (por ejemplo, cargar solo hasta 80 %) desde el panel de YogaSMC.
+
+### 2026-11-21 04:12 - Icono "BateriaT470p": límite de carga y luz que respira
+- App de barra de menús propia (`~/hackintosh-mac/limite-bateria/main.swift` → /Applications/BateriaT470p.app, firmada ad-hoc, en ítems de inicio).
+  - Opciones: cargar hasta 60 / 80 / 90 % o normal (100 %). Usa las propiedades `Battery`=1 (BAT0), `setCMstop` (BCSS) y `setCMstart` (BCCS = tope − 5) del driver ThinkVPC.
+  - El icono muestra el tope actual (lee BAT_PRIMARY.BCSG). El límite lo guarda el EC: se respeta en Windows y con la laptop apagada.
+  - También trae un interruptor "Luz del teclado que respira" (llama a LuzTeclado respirar/parar).
+- Probado: BCSG 0x300 → 0x350 (80 %), BCTG → 0x34B (75 %), y de regreso a 0x300/0x300 (normal). Se dejó en **normal**; Andrew decide si lo activa.
+- Para quitarlo: elegir "Carga normal", salir de la app y borrar /Applications/BateriaT470p.app y su ítem de inicio.
+
+### 2026-11-21 04:20 - Ethernet funciona y más funciones de la BIOS en el menú de la batería
+- **Ethernet (en0, I219-V5):** ya tiene enlace: `status: active`, 192.168.2.67, la ruta por defecto sale por en0. Negoció **100baseTX full-duplex** (100 Mbps), no gigabit.
+  Si el módem es gigabit, lo más probable es el cable (Cat5 viejo o con un par dañado) o el puerto del módem.
+- **Métodos del DSDT (HKEY) revisados:** BCTG/BCCS/BCSG/BCSS (umbrales), BICG/BICS (pausar carga), BDSG/BDSS (descarga forzada), PSSG/PSSS (peak shift), GMKS/SMKS (Fn Lock), GSKL/SSKL (idioma del teclado), MLCG/MLCS (luz del teclado), LED (LEDs), GBDC/SBDC (Bluetooth), GWAN/SWAN (WWAN), SAUM/SSMS/SHDA (audio y LEDs de silencio).
+  Además está la interfaz WMI de configuración de la BIOS de Lenovo (WMA1…WMAC/WQAx); se usa desde Windows.
+- **Pruebas con YogaSMC (todo se regresó como estaba):**
+  - Fn Lock (`FnlockMode`): OK.
+  - Pausar carga (`setCMInhibitCharge`): OK, BICG 0x70 → 0x171 → 0x170.
+  - Descarga forzada (`setCMForceDischarge`): **no aplica** en esta BIOS (BDSG se queda en 0x700).
+  - Pitidos: la propiedad no existe en este modelo.
+- **BateriaT470p** ahora también tiene: "Pausar la carga (aunque esté conectada)", "Fn Lock" y "Punto rojo de la tapa" (prendido 0x8A / apagado 0x0A / parpadeando 0xCA, método LED vía YogaSMC).
+
+### 2026-11-21 04:35 - Arreglo de las "luces locas": respiración desconectada de Fn + Espacio
+- **Problema:** había **15 copias** de `LuzTeclado respirar` corriendo al mismo tiempo. Cada cambio de luz por software (MLCS) hace que la BIOS mande el mismo aviso 0x1012 que Fn + Espacio, y YogaSMC no los distingue: solo marca con 0x10 los cambios de su propio temporizador (`backlightStimulation`).
+  Así se formó un bucle: cambio → aviso → `ciclo` → otra respiración. La prueba de antes no lo mostró porque todavía no estaba conectado al evento.
+- **Arreglo:**
+  - Fn + Espacio regresa a lo normal (`Events > 1012` = acción `backlight`, `display` = false para que no salga el aviso en pantalla mientras respira).
+  - LuzTeclado nuevo: `rapido` (160 ms), `medio` (380 ms), `lento` (750 ms) y `parar`. Al arrancar mata cualquier otra copia; solo cuenta procesos cuyo **programa** es LuzTeclado, nunca un `parar` ni una terminal que lo mencione.
+  - Se corrigió un bloqueo: la lista de `ps` se leía después de esperarlo y se trababa.
+  - Probado: rápido → medio → lento deja siempre 1 proceso; `parar` deja 0.
+- BateriaT470p: submenú "Luz del teclado" con Normal / Respirar rápido / medio / lento, con palomita en el modo activo.

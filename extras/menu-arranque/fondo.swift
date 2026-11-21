@@ -53,7 +53,7 @@ let filas: [(String, String)] = [
     ("GPU", "Intel HD Graphics 630 · Metal 3 · 1.5 GB"),
     ("RAM", "16 GB DDR4 · 2400 MHz · 2 × 8 GB"),
     ("SSD", "Kingston A400 · 480 GB SATA"),
-    ("PANTALLA", "15.6\" Full HD 1920 × 1080"),
+    ("PANTALLA", "14\" Full HD 1920 × 1080 · IPS"),
     ("RED", "Intel 8265 WiFi AC · Bluetooth 4.2 · I219-V"),
 ]
 let etiqueta = fuente("HelveticaNeue-Bold", 15, .bold)
