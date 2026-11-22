@@ -77,10 +77,19 @@ disco)
   diskutil unmount "$DEV" >/dev/null || true; echo "Listo. Reinicia.";;
 quitar)
   montar_efi_mac; OC="$MPMAC/EFI/OC"
-  ULT=$(ls -d "$MPMAC"/BITACORA-MAC/respaldos/gpu-kext-antes-* 2>/dev/null | sort | tail -1)
-  [ -n "$ULT" ] && cp "$ULT/config.plist" "$OC/config.plist"
+  # Se quita la entrada directo del config (no se depende de un respaldo: si se instalo dos veces, el ultimo ya la traia)
+  cp "$OC/config.plist" "$LOC/respaldos/config-antes-de-quitar-gpu-kext-$STAMP.plist"
+  /usr/bin/python3 -I - "$OC/config.plist" <<'PY2'
+import plistlib, sys
+f = sys.argv[1]; p = plistlib.load(open(f, 'rb'))
+antes = len(p['Kernel']['Add'])
+p['Kernel']['Add'] = [x for x in p['Kernel']['Add'] if x.get('BundlePath') != 'GraficaT470p.kext']
+plistlib.dump(p, open(f, 'wb'), sort_keys=False)
+print("entradas quitadas:", antes - len(p['Kernel']['Add']))
+PY2
   rm -rf "$OC/Kexts/GraficaT470p.kext"
-  log ""; log "### $(date '+%Y-%m-%d %H:%M') - GraficaT470p.kext quitado de EFI-MAC (config de \`$(basename "${ULT:-ninguno}")\`)"
+  [ -x "$OCV" ] && "$OCV" "$OC/config.plist" | tail -1 || true
+  log ""; log "### $(date '+%Y-%m-%d %H:%M') - GraficaT470p.kext quitado de EFI-MAC (entrada borrada del config; copia en respaldos/config-antes-de-quitar-gpu-kext-$STAMP.plist)"
   diskutil unmount "$DEV" >/dev/null || true; echo "Listo. Reinicia.";;
 *) sed -n 2,6p "$0";;
 esac

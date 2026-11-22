@@ -49,7 +49,7 @@ Al terminar tienes la carpeta `USB-T470p/` con `EFI/` y `com.apple.recovery.boot
 
 | Componente | Estado | Cómo |
 |---|---|---|
-| Gráfica HD 630 | ✅ Metal 3, **1.0 GHz fija** (su máximo) con GraficaT470p.kext, 2 GB de video | WhateverGreen, `ig-platform-id 0x591B0000`, `rps-control` = 1, `framebuffer-unifiedmem` 2048 MB |
+| Gráfica HD 630 | ✅ Metal 3, **1.0 GHz fija** (su máximo) y sin dormirse, con **GraficaT470p.kext** (propio, ya en `EFI/`), 2 GB de video | WhateverGreen, `ig-platform-id 0x591B0000`, `rps-control` = 1, `framebuffer-unifiedmem` 2048 MB |
 | HDMI | ✅ detecta al arrancar, RGB a 75 Hz | parche `con1` + `igfxonln=1` + override de la TV |
 | Panel interno | ✅ 60 Hz | ⚠️ **no subirlo a 75 Hz**: funcionó unas horas, pero al despertar la pantalla el panel BOE perdió la sincronización y quedó con retención de imagen (ver bitácora) |
 | WiFi | ✅ **nativo** (icono de WiFi de macOS, Ubicación) | AirportItlwm Tahoe 2.4.0 |
@@ -102,6 +102,8 @@ docs/
   bitacora.md            todo lo que se hizo, con fechas, respaldos y cómo deshacer cada cambio
   windows.md             lo que se hizo desde Windows (particiones, USB, mapa USB)
 scripts/macos/           scripts usados en macOS (WiFi, audio, montaje NTFS, menú, teclado...)
+extras/kext-gpu/         GraficaT470p.kext: código, compilador sin Xcode, script de prueba en USB/instalación
+extras/rendimiento/      pruebas propias de CPU/GPU/FPS/video y ajustes de rendimiento
 extras/                  SSDT-ECRW, fondo del menú, teclado latinoamericano, TeclaWindows,
                          y extras/opencore/: código del panel EN VIVO y de la herramienta Diagnóstico
 ```

@@ -797,3 +797,29 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
 - GPUDespierta apagado y deshabilitado (`launchctl disable`): ya no hace falta. FPS moviendo el mouse: 60 parejo, incluso con MedidorFPS + otra captura (antes 30).
 - `rampa-gpu` no sirve para esto (lotes de 3 ms compiten con WindowServer); la medida buena es el registro RPSTAT1 que publica el kext.
 - Falta: probar suspensión desde la USB y luego `sudo bash ~/hackintosh-mac/kext-gpu/gpu-kext.sh disco`.
+
+### 2026-11-21 21:45 - Prueba de 5 min con uso real (GraficaT470p desde la USB)
+- `rendimiento/monitor-gpu.sh 300` → `rendimiento/monitor-gpu-prueba5min.csv` (1 muestra/s): **300/300 muestras a 1000 MHz**, 0 veces abajo,
+  RC6 0 % todo el tiempo, siempre RC0. Uso de GPU prom 30 % (pico 75 %). WindowServer prom 73 % de un núcleo (2 capturas de pantalla activas).
+- FPS medidos ~30 parejos (mín 29 casi siempre): son 60 repartidos entre las 2 capturas (MedidorFPS + la prueba). Comprobado con animación:
+  con el contador 30, sin el contador 60. Los últimos 30 s bajaron porque ya no se movía nada.
+
+### 2026-11-21 22:20 - Suspensión con GraficaT470p (desde la USB): bien
+- Menú → Reposo, ~1 min, despertar con teclado: "DarkWake to FullWake from Normal Sleep ... due to HID Activity". Sin fallos.
+- Después de despertar: RC6 "APAGADO" otra vez, 1000 MHz, 0 % dormida (el kext retomó la referencia).
+- Demoras al dormir normales (AppleHDA 305 ms, AppleIntelFramebuffer 606 ms, en0 1.7 s). bluetoothd se reinició solo (lo de siempre, no es del kext).
+- Listo para `sudo bash ~/hackintosh-mac/kext-gpu/gpu-kext.sh disco`.
+
+### 2026-11-21 22:21 - GraficaT470p.kext instalado en EFI-MAC
+- Respaldo: `BITACORA-MAC/respaldos/gpu-kext-antes-20261121-222143/config.plist`. Quitar: `sudo bash ~/hackintosh-mac/kext-gpu/gpu-kext.sh quitar`.
+- Si no arranca: boot-arg `-gt470poff` o arrancar con la USB y correr quitar.
+
+### 2026-11-21 22:30 - GraficaT470p.kext instalado en EFI-MAC
+- Respaldo: `BITACORA-MAC/respaldos/gpu-kext-antes-20261121-223006/config.plist`. Quitar: `sudo bash ~/hackintosh-mac/kext-gpu/gpu-kext.sh quitar`.
+- Si no arranca: boot-arg `-gt470poff` o arrancar con la USB y correr quitar.
+
+### 2026-11-21 22:40 - GraficaT470p en el disco: verificado
+- Arrancado desde EFI-MAC (sin la USB conectada): kext 1.1.0 cargado, ganchos CS5 + anillo, RC6 apagado, 1000 MHz, 0 % dormida.
+- `disco` se corrió dos veces (22:21 y 22:30): una sola entrada en el config (el script quita la vieja antes). Como el 2º respaldo ya traía el kext,
+  `gpu-kext.sh quitar` ahora borra la entrada directo del config (probado sobre una copia) en vez de restaurar un respaldo.
+- Repo: GraficaT470p ya va en `EFI/OC/Kexts` y en el config.plist del repo, después de WhateverGreen.
