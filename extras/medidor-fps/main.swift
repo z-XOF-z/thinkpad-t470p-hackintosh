@@ -163,9 +163,13 @@ final class App: NSObject, NSApplicationDelegate {
             let fps = min(i.contador.tomar(), tope)
             if CommandLine.arguments.contains("--visible") { print("pantalla \(i.pantallaID): \(fps) FPS de \(hz) Hz") }
             // Verde: fluido. Amarillo: a medias. Rojo: se esta trabando. Gris: nada se mueve (no hay que dibujar).
-            let color: NSColor = fps < 5 ? NSColor(white: 0.75, alpha: 1)
+            // El contador mide cuadros NUEVOS: si nadie toca mouse/teclado y nada se anima, macOS no dibuja y el numero baja
+            // sin que haya trabazon. Por eso: sin uso en el ultimo segundo y pocos FPS = "reposo" (gris), no rojo.
+            let sinUso = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: unsafeBitCast(UInt32.max, to: CGEventType.self)) > 1.0   // kCGAnyInputEventType = cualquier tecla o mouse
+            let enReposo = sinUso && fps < tope * 85 / 100
+            let color: NSColor = enReposo || fps < 5 ? NSColor(white: 0.75, alpha: 1)
                 : fps >= tope * 85 / 100 ? .systemGreen : fps >= tope / 2 ? .systemYellow : .systemRed
-            let txt = (fps >= tope - 1 && hz > tope) ? "\(tope)+ FPS" : "\(fps) FPS"
+            let txt = enReposo ? "reposo" : (fps >= tope - 1 && hz > tope) ? "\(tope)+ FPS" : "\(fps) FPS"
             i.mostrar(txt, "GPU \(gpu)\nCPU \(cpu)%", color: color)
         }
     }

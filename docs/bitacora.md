@@ -742,3 +742,10 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
   Medido con su propio pulso: continuo = 647 MHz-equivalente (tope de ese cálculo); pausa 2 ms = 97 %, 4 ms = 93 %, 8 ms = 92 %, 16 ms = 87 % del tope.
 - LaunchAgent `~/Library/LaunchAgents/com.andrew.gpudespierta.plist` (RunAtLoad + KeepAlive). Interruptor en BateriaT470p → "GPU siempre al máximo (1.1 GHz)"
   (apagar = `launchctl bootout` + `disable`, no vuelve al iniciar sesión).
+
+### 2026-11-21 20:00 - FPS que "bajaban a 21": no era trabazón
+- Medido con `rendimiento/fpslog` y `rendimiento/fps-mouse` (ignorando VS Code, moviendo el mouse por código):
+  moviendo el mouse **60-61 parejo**; quieto 52-57; animación constante 60 con o sin GPUDespierta.
+- Dos capturas de pantalla a la vez (MedidorFPS + otra medición) se reparten los cuadros: cada una ve ~30. Medir siempre con una sola.
+- El contador mide cuadros NUEVOS: si nada cambia, macOS no dibuja y el número baja aunque todo vaya fluido.
+- MedidorFPS ahora muestra **"reposo"** en gris si no hubo teclado/mouse en el último segundo y los FPS están bajos. Rojo/amarillo solo cuenta mientras se usa.
