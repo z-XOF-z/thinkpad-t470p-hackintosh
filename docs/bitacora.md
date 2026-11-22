@@ -785,3 +785,15 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
 - Verificado: clase `IntelAccelerator` registrada con `PerformanceStatistics`; `SafeForceWake(bool)` = `SafeForceWake(bool, 7)` (los 3 dominios);
   317 símbolos, 0 faltantes (kernel 25.6 + Lilu 1.7.2).
 - USB `disk6s1` (OPENCORE, 15.9 GB): respaldo completo de su EFI en `respaldos/usb-OPENCORE-completa-20261121-210430/`.
+
+### 2026-11-21 21:14 - GraficaT470p.kext en la USB para probar
+- USB disk6s1 = copia de EFI-MAC + GraficaT470p (después de WhateverGreen). Respaldo de la USB: `respaldos/usb-OC-antes-gpu-kext-20261121-211232`.
+
+### 2026-11-21 21:30 - GraficaT470p 1.1.0 PROBADO desde la USB: funciona
+- Arrancado con F12 → USB (EFI-MAC + GraficaT470p). `kextstat`: com.andrew.GraficaT470p (1.1.0) cargado después de WhateverGreen.
+- ioreg: Ganchos "CS5 + anillo", RC6 "APAGADO", Estado GT RC0, **Tiempo dormida 0 %**, **Frecuencia actual 1000 MHz** fija en todas las lecturas.
+- **Corrección:** RP0 leído del chip = 20 → **1000 MHz**. La HD 630 del i5-7300HQ llega a 1.0 GHz (el i7-7700HQ a 1.1). Ya está en su máximo absoluto.
+- "Bajadas evitadas" = 0 y "Último pedido de Apple" = 1000: con `rps-control` Apple ya pedía el máximo; lo que la bajaba era el **RC6** (se dormía entre trabajos).
+- GPUDespierta apagado y deshabilitado (`launchctl disable`): ya no hace falta. FPS moviendo el mouse: 60 parejo, incluso con MedidorFPS + otra captura (antes 30).
+- `rampa-gpu` no sirve para esto (lotes de 3 ms compiten con WindowServer); la medida buena es el registro RPSTAT1 que publica el kext.
+- Falta: probar suspensión desde la USB y luego `sudo bash ~/hackintosh-mac/kext-gpu/gpu-kext.sh disco`.

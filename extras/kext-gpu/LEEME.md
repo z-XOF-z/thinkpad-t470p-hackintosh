@@ -1,6 +1,6 @@
 # GraficaT470p.kext (experimental)
 
-Plugin de Lilu que deja la GPU Intel HD 630 de la T470p **siempre a su frecuencia máxima** (RP0, 1100 MHz).
+Plugin de Lilu que deja la GPU Intel HD 630 de la T470p **siempre a su frecuencia máxima** (RP0 leído del chip: 1000 MHz en el i5-7300HQ).
 
 ## Por qué
 - WhateverGreen `rps-control` pide el máximo cada vez que se manda trabajo a la GPU, pero el driver de Apple
@@ -39,3 +39,11 @@ sudo bash gpu-kext.sh quitar
 ```
 Verificar: `ioreg -l -w0 -c GraficaT470p` (RP0, ganchos, "Bajadas evitadas") y `rendimiento/rampa-gpu` con GPUDespierta apagado.
 Boot-args: `-gt470poff` (desactiva todo), `-gt470prc6` (deja el RC6 como Apple), `gt470pmhz=NNN` (frecuencia fija).
+
+## Resultado (2026-11-21, desde la USB)
+| | Antes | Con GraficaT470p |
+|---|---|---|
+| Frecuencia real (RPSTAT1) | 350–1000 MHz, se dormía entre trabajos | **1000 MHz fija** |
+| Tiempo dormida (RC6) | variable | **0 %** |
+| FPS moviendo el mouse con 2 capturas | ~30 | **60** |
+| GPUDespierta | necesario (~20 % de la GPU) | ya no |

@@ -43,7 +43,7 @@ constexpr uint32_t GEN6_RP_STATE_CAP    = MCHBAR_MIRROR_BASE + 0x5998;
 constexpr uint32_t GEN6_RPSTAT1         = 0xA01C;              // bits 31:23 = CAGF (frecuencia actual, x 50/3 MHz)
 constexpr uint32_t GEN6_GT_CORE_STATUS  = 0x138060;            // bits 2:0 = estado RC (0 = RC0 despierta)
 constexpr uint32_t GEN6_GT_GFX_RC6      = 0x138108;            // contador de tiempo en RC6 (unidades de 1.28 us)
-constexpr uint32_t RP0_RESPALDO         = 22;   // 22 x 50 MHz = 1100 MHz (maximo de la HD 630 en el i5-7300HQ)
+constexpr uint32_t RP0_RESPALDO         = 20;   // 20 x 50 MHz = 1000 MHz (maximo de la HD 630 en el i5-7300HQ, leido del chip)
 
 const char *rutaKBL[] { "/System/Library/Extensions/AppleIntelKBLGraphics.kext/Contents/MacOS/AppleIntelKBLGraphics" };
 KernelPatcher::KextInfo kextKBL { "com.apple.driver.AppleIntelKBLGraphics", rutaKBL, arrsize(rutaKBL), {}, {}, KernelPatcher::KextInfo::Unloaded };
@@ -107,7 +107,7 @@ void leerRP0() {
 }
 
 // Los ganchos pueden correr en el temporizador del driver: aqui NO se mapea memoria ni se reserva nada.
-// RP0 se lee desde el thread_call `publicar`; mientras tanto se usa el respaldo (1100 MHz).
+// RP0 se lee desde el thread_call `publicar`; mientras tanto se usa el respaldo (1000 MHz).
 inline uint32_t pedirMax(uint32_t pedidoApple) {
 	ultimoPedidoApple = pedidoApple;
 	if ((pedidoApple >> GEN9_FREQUENCY_SHIFT) < (valorMax >> GEN9_FREQUENCY_SHIFT))
@@ -207,7 +207,7 @@ void publicar(thread_call_param_t, thread_call_param_t) {
 		yo->setProperty("Estado GT", estadoRC == 0 ? "RC0 (despierta)" : estadoRC == 0xFF ? "?" : "RC6 (dormida)");
 		yo->setProperty("RC6", !sinRC6 ? "como Apple (boot-arg -gt470prc6)" : despiertoTomado ? "APAGADO (GPU siempre despierta)" : durmiendo ? "Mac dormida" : "esperando al acelerador");
 		yo->setProperty("RP0 MHz", rp0 * 50, 32);
-		yo->setProperty("RP0 fuente", rp0Fuente == 1 ? "leido de la GPU" : rp0Fuente == 2 ? "respaldo 1100 MHz" : rp0Fuente == 3 ? "boot-arg gt470pmhz" : "aun no");
+		yo->setProperty("RP0 fuente", rp0Fuente == 1 ? "leido de la GPU" : rp0Fuente == 2 ? "respaldo 1000 MHz" : rp0Fuente == 3 ? "boot-arg gt470pmhz" : "aun no");
 		yo->setProperty("Valor pedido 0xA008", valorMax, 32);
 		yo->setProperty("Ultimo pedido de Apple MHz", (ultimoPedidoApple >> GEN9_FREQUENCY_SHIFT) * 50 / GEN9_FREQ_SCALER, 32);
 		yo->setProperty("Llamadas setGTFrequencyMMIO", llamadasMMIO, 64);
