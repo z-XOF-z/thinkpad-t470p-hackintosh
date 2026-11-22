@@ -56,6 +56,7 @@ Al terminar tienes la carpeta `USB-T470p/` con `EFI/` y `com.apple.recovery.boot
 | Bluetooth | ✅ AirPods, iPhone, bocinas | IntelBluetoothFirmware 2.5.3 + BlueToolFixup |
 | Audio (bocina, audífonos, micrófono) | ✅ | AppleALC layout **29** + AppleHDA por root patch (OCLP-Mod) |
 | Apple Music / DRM | ✅ | `unfairgva=7` |
+| YouTube en Safari | ✅ hasta 1080p60 | apagar VP9 en Safari: `defaults write com.apple.Safari "WebKitPreferences.vp9DecoderEnabled" -bool false`. Con SMBIOS MBP16,2 macOS anuncia VP9 por hardware pero la HD 630 no lo decodifica (1080p VP9 = "Se produjo un error"); así YouTube usa H.264 |
 | Teclado y touchpad | ✅ gestos, clic derecho con dos dedos | VoodooPS2 2.3.7 |
 | Botones del TrackPoint | ⚠️ apagados a propósito | congelaban el puntero (también pasa en Linux) |
 | Teclas Fn de ThinkPad | ✅ F7 proyectar, F9 ajustes, F10 BT, ⭐ abre VS Code | YogaSMC + YogaSMCNC |

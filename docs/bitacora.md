@@ -749,3 +749,14 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
 - Dos capturas de pantalla a la vez (MedidorFPS + otra medición) se reparten los cuadros: cada una ve ~30. Medir siempre con una sola.
 - El contador mide cuadros NUEVOS: si nada cambia, macOS no dibuja y el número baja aunque todo vaya fluido.
 - MedidorFPS ahora muestra **"reposo"** en gris si no hubo teclado/mouse en el último segundo y los FPS están bajos. Rojo/amarillo solo cuenta mientras se usa.
+
+### 2026-11-21 20:50 - YouTube 1080p en Safari: "Se produjo un error" → VP9 apagado en Safari
+- Reproducido con `rendimiento/prueba-youtube` (WebKit, el motor de Safari, con YouTube real): 480p = H.264 (`avc1`, formato 135) funciona;
+  al subir a 1080p YouTube cambia a **VP9** (`vp09.00.51.08`, formato 303) → 0 cuadros → error y regresa a 480p.
+- Causa: con el SMBIOS MacBookPro16,2 (Ice Lake) macOS dice que hay VP9 por hardware (`VTIsHardwareDecodeSupported(VP9)` = true),
+  pero la HD 630 con el driver de Apple no lo decodifica. H.264 y HEVC sí van por hardware.
+- Arreglo: VP9 apagado en Safari → YouTube manda 1080p60 en H.264 (`avc1.64002A`, formato 299).
+  `defaults write com.apple.Safari "WebKitPreferences.vp9DecoderEnabled" -bool false` (= Ajustes → Avanzado → Feature Flags → "VP9 decoder").
+  Medido: 1080p60 sin error, **6 cuadros perdidos de 1065**, GPU al 37 %. Se pierde 1440p/4K en YouTube (solo hay VP9/AV1).
+- Con MedidorFPS prendido el mismo video perdía ~30 % de cuadros (la captura de pantalla compite): apagarlo para ver videos.
+- Deshacer: `defaults delete com.apple.Safari "WebKitPreferences.vp9DecoderEnabled"`.
