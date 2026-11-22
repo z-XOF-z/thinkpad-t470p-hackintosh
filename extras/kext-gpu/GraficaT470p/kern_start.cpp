@@ -69,6 +69,8 @@ IOService *acelerador = nullptr;
 bool sinRC6 = true;                 // boot-arg -gt470prc6 lo deja como Apple (con RC6)
 volatile bool despiertoTomado = false, durmiendo = false;
 IONotifier *avisoDormir = nullptr;
+IOLock *candado = nullptr;          // tomar/soltar nunca al mismo tiempo (publicar vs. dormir/apagar)
+uint64_t despertoEn = 0;            // mach_absolute_time del ultimo despertar: esperar 3 s antes de retomar
 uint32_t mhzActual = 0, estadoRC = 0xFF, rc6Antes = 0, pctRC6 = 0;
 
 IOPCIDevice *gpu = nullptr;
@@ -133,7 +135,11 @@ inline uint32_t leerReg(uint32_t r) {
 }
 
 void tomarDespierto() {
-	if (!sinRC6 || despiertoTomado || durmiendo || !orgSafeForceWake) return;
+	if (!sinRC6 || despiertoTomado || durmiendo || !orgSafeForceWake || !candado) return;
+	if (despertoEn) {
+		uint64_t tres; nanoseconds_to_absolutetime(3000ULL * 1000 * 1000, &tres);
+		if (mach_absolute_time() - despertoEn < tres) return;
+	}
 	if (!acelerador) {
 		auto m = IOService::serviceMatching("IntelAccelerator");
 		if (!m) return;
@@ -146,21 +152,33 @@ void tomarDespierto() {
 	}
 	// Esperar a que el acelerador este trabajando de verdad (publica sus estadisticas cuando ya arranco)
 	if (acelerador->isInactive() || !acelerador->getProperty("PerformanceStatistics")) return;
-	reinterpret_cast<SafeForceWakeT>(orgSafeForceWake)(acelerador, true);
-	despiertoTomado = true;
-	SYSLOG("gt470p", "RC6 apagado: referencia de despierto tomada");
+	IOLockLock(candado);
+	if (!despiertoTomado && !durmiendo) {
+		reinterpret_cast<SafeForceWakeT>(orgSafeForceWake)(acelerador, true);
+		despiertoTomado = true;
+		SYSLOG("gt470p", "RC6 apagado: referencia de despierto tomada");
+	}
+	IOLockUnlock(candado);
 }
 
 void soltarDespierto() {
-	if (!despiertoTomado || !acelerador || !orgSafeForceWake) return;
-	reinterpret_cast<SafeForceWakeT>(orgSafeForceWake)(acelerador, false);
-	despiertoTomado = false;
-	SYSLOG("gt470p", "referencia de despierto soltada");
+	if (!candado || !acelerador || !orgSafeForceWake) return;
+	IOLockLock(candado);
+	if (despiertoTomado) {
+		reinterpret_cast<SafeForceWakeT>(orgSafeForceWake)(acelerador, false);
+		despiertoTomado = false;
+		SYSLOG("gt470p", "referencia de despierto soltada");
+	}
+	IOLockUnlock(candado);
 }
 
 IOReturn alDormirDespertar(void *, void *, UInt32 tipo, IOService *, void *, vm_size_t) {
-	if (tipo == kIOMessageSystemWillSleep) { durmiendo = true; soltarDespierto(); }
-	else if (tipo == kIOMessageSystemHasPoweredOn) { durmiendo = false; }   // publicar() la vuelve a tomar en <= 2 s
+	// Antes de dormir, apagar o reiniciar: soltar la referencia (que el driver de Apple apague la GPU como siempre)
+	if (tipo == kIOMessageSystemWillSleep || tipo == kIOMessageSystemWillPowerOff || tipo == kIOMessageSystemWillRestart) {
+		durmiendo = true; soltarDespierto();
+	} else if (tipo == kIOMessageSystemHasPoweredOn) {
+		despertoEn = mach_absolute_time(); durmiendo = false;   // publicar() la vuelve a tomar 3-5 s despues
+	}
 	return kIOReturnSuccess;
 }
 
@@ -201,7 +219,7 @@ void publicar(thread_call_param_t, thread_call_param_t) {
 }
 
 void alCargarKext(void *, KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size) {
-	if (!kextKBL.loadIndex || kextKBL.loadIndex != index) return;
+	if (kextKBL.loadIndex != index) return;
 
 	KernelPatcher::RouteRequest req5 { "__ZN26IGHardwareCommandStreamer518setGTFrequencyMMIOEj", ganchoSetFreq5, orgSetFreq5 };
 	gancho5 = patcher.routeMultiple(index, &req5, 1, address, size);
@@ -237,6 +255,7 @@ void iniciar() {
 	SYSLOG("gt470p", "GraficaT470p: GPU siempre al maximo");
 	rp0 = RP0_RESPALDO; calcularValor();   // valor seguro desde el arranque
 	sinRC6 = !checkKernelArgument("-gt470prc6");
+	candado = IOLockAlloc();
 	lilu.onPatcherLoadForce(alArrancarPatcher);
 	lilu.onKextLoadForce(&kextKBL, 1, alCargarKext);
 	publicador = thread_call_allocate(publicar, nullptr);

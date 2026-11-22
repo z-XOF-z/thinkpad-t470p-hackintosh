@@ -778,3 +778,10 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
   y la retoma al despertar (≤ 2 s). Así la GPU no se apaga entre trabajos ni tiene que volver a subir de frecuencia.
 - ioreg `GraficaT470p`: "Frecuencia actual MHz" (RPSTAT1), "Estado GT" (0x138060), "Tiempo dormida % (RC6)" (0x138108), RC6, ganchos y bajadas evitadas.
 - Boot-arg nuevo `-gt470prc6` (deja el RC6 como Apple). Sigue sin instalar: probar en USB con `kext-gpu/gpu-kext.sh`.
+
+### 2026-11-21 22:15 - GraficaT470p revisado antes de la USB
+- Mejoras de la revisión: candado (IOLock) entre tomar/soltar la referencia de despierto; también se suelta al **apagar y reiniciar**
+  (no solo al dormir) para no causar shutdown stalls; al despertar espera 3 s antes de retomarla; chequeo de índice del kext igual que WhateverGreen.
+- Verificado: clase `IntelAccelerator` registrada con `PerformanceStatistics`; `SafeForceWake(bool)` = `SafeForceWake(bool, 7)` (los 3 dominios);
+  317 símbolos, 0 faltantes (kernel 25.6 + Lilu 1.7.2).
+- USB `disk6s1` (OPENCORE, 15.9 GB): respaldo completo de su EFI en `respaldos/usb-OPENCORE-completa-20261121-210430/`.
