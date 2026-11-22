@@ -320,6 +320,14 @@
 				<data>
 				AAAwAQ==
 				</data>
+				<key>rps-control</key>
+				<data>
+				AQAAAA==
+				</data>
+				<key>framebuffer-unifiedmem</key>
+				<data>
+				AAAAgA==
+				</data>
 			</dict>
 		</dict>
 		<key>Delete</key>
@@ -821,7 +829,7 @@
 				<key>BundlePath</key>
 				<string>CPUFriendDataProvider.kext</string>
 				<key>Comment</key>
-				<string>Perfil MBP16,2 con EPP 0x20 (rendimiento)</string>
+				<string>Perfil MBP16,2 con EPP 0x00 (maximo rendimiento)</string>
 				<key>Enabled</key>
 				<true/>
 				<key>ExecutablePath</key>

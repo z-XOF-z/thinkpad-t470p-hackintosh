@@ -62,6 +62,15 @@ func hayPantallaExterna() -> Bool {
 }
 let claveTapaTV = "DormirConTapaAunqueHayaTV"
 
+// --- Contador de FPS (app MedidorFPS, esquina inferior izquierda). Se recuerda si estaba prendido. ---
+let claveFPS = "MostrarFPS"
+let idFPS = "com.andrew.medidorfps"
+func fpsCorriendo() -> Bool { !NSRunningApplication.runningApplications(withBundleIdentifier: idFPS).isEmpty }
+func abrirFPS() {
+    let c = NSWorkspace.OpenConfiguration(); c.activates = false
+    NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: "/Applications/MedidorFPS.app"), configuration: c)
+}
+
 let luz = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/LuzTeclado").path
 let pidLuz = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Application Support/LuzTeclado/respirar.pid").path
@@ -93,6 +102,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         item.menu = menu
         poner("Battery", 1)
+        if UserDefaults.standard.bool(forKey: claveFPS) && !fpsCorriendo() { abrirFPS() }
         actualizarIcono()
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.actualizarIcono() }
 
@@ -173,6 +183,10 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         tt.target = self
         tt.state = UserDefaults.standard.bool(forKey: claveTapaTV) ? .on : .off
         m.addItem(tt)
+        let fp = NSMenuItem(title: "Mostrar FPS, GPU y CPU (esquina inferior izquierda)", action: #selector(fps(_:)), keyEquivalent: "")
+        fp.target = self
+        fp.state = fpsCorriendo() ? .on : .off
+        m.addItem(fp)
         m.addItem(.separator())
         let s = NSMenuItem(title: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         m.addItem(s)
@@ -185,6 +199,15 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func pausa(_ s: NSMenuItem) { pausarCarga(!cargaEnPausa()) }
     @objc func tapaTV(_ s: NSMenuItem) { UserDefaults.standard.set(!UserDefaults.standard.bool(forKey: claveTapaTV), forKey: claveTapaTV) }
+    @objc func fps(_ s: NSMenuItem) {
+        if fpsCorriendo() {
+            NSRunningApplication.runningApplications(withBundleIdentifier: idFPS).forEach { $0.terminate() }
+            UserDefaults.standard.set(false, forKey: claveFPS)
+        } else {
+            abrirFPS()
+            UserDefaults.standard.set(true, forKey: claveFPS)
+        }
+    }
     @objc func fn(_ s: NSMenuItem) { ponerFnLock(!fnLock()) }
     @objc func punto(_ s: NSMenuItem) { puntoRojo(s.tag) }
 

@@ -40,7 +40,7 @@ Al terminar tienes la carpeta `USB-T470p/` con `EFI/` y `com.apple.recovery.boot
 | **Gráfica** | Intel HD Graphics 630 (8086:591B) — sin NVIDIA |
 | **RAM** | 16 GB DDR4 2400 MHz |
 | **Disco** | Kingston A400 480 GB SATA (Windows + macOS 80 GB) |
-| **Pantalla** | 15.6" Full HD 1920×1080 |
+| **Pantalla** | 14" Full HD 1920×1080 IPS (BOE) |
 | **Red** | Intel Wireless-AC 8265 + Bluetooth · Intel I219-V5 |
 | **Audio** | Realtek ALC298 |
 | **SMBIOS** | MacBookPro16,2 |
@@ -49,9 +49,9 @@ Al terminar tienes la carpeta `USB-T470p/` con `EFI/` y `com.apple.recovery.boot
 
 | Componente | Estado | Cómo |
 |---|---|---|
-| Gráfica HD 630 | ✅ Metal 3, aceleración completa | WhateverGreen, `ig-platform-id 0x591B0000` |
+| Gráfica HD 630 | ✅ Metal 3, sube a su máximo (~1.1 GHz) con carga, 2 GB de video | WhateverGreen, `ig-platform-id 0x591B0000`, `rps-control` = 1, `framebuffer-unifiedmem` 2048 MB |
 | HDMI | ✅ detecta al arrancar, RGB a 75 Hz | parche `con1` + `igfxonln=1` + override de la TV |
-| Panel a 75 Hz | ✅ | override del EDID (60 → 75 Hz) |
+| Panel interno | ✅ 60 Hz | ⚠️ **no subirlo a 75 Hz**: funcionó unas horas, pero al despertar la pantalla el panel BOE perdió la sincronización y quedó con retención de imagen (ver bitácora) |
 | WiFi | ✅ **nativo** (icono de WiFi de macOS, Ubicación) | AirportItlwm Tahoe 2.4.0 |
 | Bluetooth | ✅ AirPods, iPhone, bocinas | IntelBluetoothFirmware 2.5.3 + BlueToolFixup |
 | Audio (bocina, audífonos, micrófono) | ✅ | AppleALC layout **29** + AppleHDA por root patch (OCLP-Mod) |
@@ -60,17 +60,17 @@ Al terminar tienes la carpeta `USB-T470p/` con `EFI/` y `com.apple.recovery.boot
 | Botones del TrackPoint | ⚠️ apagados a propósito | congelaban el puntero (también pasa en Linux) |
 | Teclas Fn de ThinkPad | ✅ F7 proyectar, F9 ajustes, F10 BT, ⭐ abre VS Code | YogaSMC + YogaSMCNC |
 | Ventilador | ✅ control Auto / Full | YogaSMC + `SSDT-ECRW` |
-| CPU | ✅ XCPM, turbo rápido | CPUFriend (EPP 0x20) |
+| CPU | ✅ XCPM, 3.1 GHz en los 4 núcleos / 3.5 en uno (máximo de fábrica) | CPUFriend con EPP **0x00** (máximo rendimiento) |
 | Batería | ✅ %, ciclos, salud | SMCBatteryManager |
 | Lector SD (RTS522A) | ✅ | RealtekCardReader 0.9.8 |
 | USB 2/3 | ✅ mapa propio | USBToolBox + UTBMap |
 | Disco de Windows (NTFS) | ✅ lectura y escritura | macFUSE 5.5 + ntfs-3g |
 | iCloud, App Store, iMessage | ✅ | SMBIOS propio |
-| Suspensión | ✅ | `hibernatemode 0` |
+| Suspensión | ✅ con la tapa y por inactividad | `hibernatemode 0`; BateriaT470p pone el ventilador en automático al dormir |
 | AirDrop iPhone → Mac, Handoff | ❌ | el chip Intel no tiene AWDL; necesita Broadcom BCM94360NG |
 | Lector de huella | ❌ | sin driver |
 | Disco de Windows al arrancar | ✅ sin avisos | `montar-windows.sh` espera a que cargue el kext de macFUSE |
-| Ethernet | 🔧 en revisión | IntelMausi carga, sin enlace todavía |
+| Ethernet | ✅ | IntelMausi |
 
 ## 🧰 Utilidades propias para macOS
 
@@ -79,8 +79,11 @@ Al terminar tienes la carpeta `USB-T470p/` con `EFI/` y `com.apple.recovery.boot
 | **BateriaT470p** (barra de menús) | Límite de carga 60/80/90/100 % (BIOS: BCCS/BCSS), pausar la carga, **Fn Lock**, punto rojo de la tapa (prendido/apagado/parpadeo) y luz del teclado que respira |
 | **LuzTeclado** | Respiración de la luz del teclado (rápida, media, lenta) con candado de una sola instancia |
 | **TeclaWindows** | Tecla Windows sola abre Apps; con el brillo al mínimo, "bajar brillo" **apaga el panel** de verdad y "subir brillo" lo prende |
-| **PantallaHz** + `pantalla-hz.sh` | Agrega un modo de **75 Hz** al panel (override del EDID) y lo prueba con confirmación de 30 s en todas las pantallas (si no confirmas, regresa a 60 Hz) |
+| **PantallaHz** + `pantalla-hz.sh` | Prueba modos de más Hz con confirmación de 30 s en todas las pantallas. ⚠️ En el panel interno **no** se recomienda (ver arriba); úsalo para la TV |
 | `tv-pantalla.sh` + `PantallaHz tv` | TV por HDMI: fuerza **RGB** (quita YCbCr del EDID: texto nítido y colores correctos) y agrega 1360×768 a **75 Hz** |
+| **MedidorFPS** | Cuadrito en la esquina inferior izquierda con FPS reales (ScreenCaptureKit, tope de 60), uso de GPU y CPU. Se prende/apaga desde BateriaT470p. Cuesta ~20 % de un núcleo de WindowServer cuando la pantalla se mueve |
+| **LimpiarPantalla** | Colores sólidos en pantalla completa que cambian suave cada 10 s: para ver defectos del panel y quitar retención de imagen |
+| `extras/rendimiento/` | `todo-al-maximo.sh` (EPP 0x00 + panel a 60 Hz), `gpu-efi.sh` (rps-control + 2 GB), `fluidez.sh` (animaciones rápidas) y pruebas propias: `ghz.c` (GHz reales del CPU por tiempo de hilo) y `ghz-gpu.swift` (MHz reales de la GPU por FMA/s; `powermetrics` no sabe leer la GPU en hackintosh) |
 
 > Aprendido: en la T470p cada cambio de la luz del teclado por software genera el mismo evento ACPI (0x1012) que Fn + Espacio.
 > Por eso la respiración no se engancha a esa tecla (se creaba un bucle).

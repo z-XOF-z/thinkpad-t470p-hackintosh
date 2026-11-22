@@ -655,3 +655,76 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
 - **BateriaT470p:**
   - Al suspender pone el ventilador en automático (`FanSpeed` = 0x84, lo maneja el EC); 3 s después de despertar regresa al nivel guardado de YogaSMCNC (`FanLevel` 71 = 0x47 = Full).
   - Opción nueva "Suspender al cerrar la tapa aunque esté la TV" (apagada por defecto): si la tapa está cerrada y hay pantalla externa, hace `pmset sleepnow`.
+
+### 2026-11-21 16:50 - Rendimiento: CPU medido, GPU, fluidez y contador de FPS
+- **CPU medido** con prueba propia (`rendimiento/ghz`, cadena de sumas = 1 ciclo cada una): **2.9 GHz con 1 núcleo y 2.75 GHz con los 4**,
+  cuando el i5-7300HQ da 3.5 / 3.1. macOS permite hasta 3.5 (`machdep.xcpm.hard_plimit_max_100mhz_ratio: 35`, CPUFriend cargado, sin aviso
+  térmico en `pmset -g therm`), así que el freno viene de BIOS/EC (límite de watts PL1/PL2 o PROCHOT). Para saber cuál:
+  `sudo bash ~/hackintosh-mac/rendimiento/medir-cpu.sh` (deja el resultado en `rendimiento/medicion-cpu.txt`).
+- **GPU:** `rendimiento/gpu-efi.sh` (sudo) agrega a la IGPU `rps-control` = 1 y `framebuffer-unifiedmem` = 2048 MB. Respaldo y `revertir` incluidos. PENDIENTE de correr.
+- **Fluidez** (sin sudo, `rendimiento/fluidez.sh`, con `revertir`): Reducir transparencia (quita el vidrio de Tahoe, aplica al cerrar sesión),
+  `NSWindowResizeTime` 0.001, Mission Control 0.15 s, sin rebote del Dock. Valores de antes en `rendimiento/valores-antes.txt` (todos venían sin valor).
+- **MedidorFPS** (`fps/main.swift` → `/Applications/MedidorFPS.app`): cuadrito en la esquina inferior izquierda de cada pantalla con FPS reales
+  (ScreenCaptureKit cuenta los cuadros que WindowServer dibuja), uso de GPU (IOAccelerator) y CPU. Verde = fluido, amarillo = a medias, rojo = trabado, gris = nada se mueve.
+  - ScreenCaptureKit nunca pasa de **60 cuadros/s** aunque el panel esté a 75 Hz (CVDisplayLink confirma **75.0 vsync/s**). Por eso al tope muestra "60+".
+    CGDisplayStream ya no entrega cuadros en Tahoe y `SLSGetPerformanceData` no regresa datos.
+  - Cuesta ~20 % de un núcleo de WindowServer cuando la pantalla se mueve (igual a 16 px que a 128 px). Se prende/apaga en BateriaT470p → "Mostrar FPS, GPU y CPU".
+  - Necesita permiso de Grabación de pantalla (Ajustes → Privacidad y seguridad).
+- **Procesos revisados:** RAM sobrada (sin swap, 85 % libre). WindowServer 16–38 % en reposo (vidrio + Tahoe en HD 630). VS Code ~30–60 % mientras Claude Code trabaja.
+  iCloud (`bird`, `cloudd`, `fileproviderd`) escribió 2 GB cada uno en la sincronización inicial de anoche; ya está en 0 %. `bluetoothd` se reinició solo 2 veces hoy (SIGABRT, Intel BT en Tahoe).
+
+### 2026-11-21 17:25 - Se veía feo y lento: contador de FPS apagado y transparencia de regreso
+- Con MedidorFPS capturando + Safari (WebKit GPU 63 %) WindowServer llegó a 78 % y la carga a 13: la Mac casi no respondía.
+- MedidorFPS apagado (`MostrarFPS` = false en BateriaT470p) y `reduceTransparency` borrado (no gustó cómo se ve). Se quedan las animaciones rápidas.
+- El cambio de la GPU (`gpu-efi.sh`) NO se había aplicado; no tuvo que ver.
+
+### 2026-11-21 17:25 - GPU HD 630: rps-control y 2 GB de memoria de video
+- DeviceProperties de la IGPU: `rps-control` = 1 (WhateverGreen sube la GPU a su máximo con carga) y `framebuffer-unifiedmem` = 2048 MB (antes 1536).
+- Respaldo: `BITACORA-MAC/respaldos/gpu-antes-20261121-172541/config.plist` y en ~/hackintosh-mac/respaldos/.
+- ocvalidate: Completed validating /Volumes/EFI-MAC/EFI/OC/config.plist in 71 ms. No issues found.
+- **Si la imagen falla:** `sudo bash ~/hackintosh-mac/rendimiento/gpu-efi.sh revertir`, o desde Windows copiar ese config.plist a EFI\OC\.
+
+### 2026-11-21 17:35 - CORRECCIÓN: el CPU SÍ va al máximo
+- `medir-cpu.sh` (powermetrics) con los 4 núcleos a tope: **3100 MHz en los 4**, limitado por `MAX_TURBO_LIMIT` (= el turbo máximo de fábrica
+  del i5-7300HQ con 4 núcleos), 68 °C, 19 W, presión térmica Nominal. No hay freno de BIOS/EC.
+- Mi prueba `ghz` estaba mal para esto: mide con el reloj de pared, y si otros procesos (Safari, WindowServer, powermetrics) le quitan turnos,
+  sale más bajo (1.1 GHz aquí). Lo correcto es lo de powermetrics.
+- GPU: `gpu-efi.sh` aplicado (ocvalidate sin problemas, respaldo `gpu-antes-20261121-172541`). Falta reiniciar.
+
+### 2026-11-21 17:35 - Panel interno: imagen partida y "fantasma" → regresado a 60 Hz
+- Mientras la laptop estaba sola (antes de aplicar gpu-efi.sh), la pantalla se apagó por inactividad y al despertar el panel quedó con la
+  imagen partida en dos/repetida y con rayas (señal de 75 Hz que el panel no aguantó al reconectar).
+- Después de reiniciar, el escritorio de macOS se seguía viendo "fantasma" encima del menú de OpenCore (que es firmware, sin drivers de macOS):
+  retención de imagen en el LCD.
+- Panel regresado a **60 Hz** con `PantallaHz 60`. Falta quitar el override: `sudo bash ~/hackintosh-mac/pantalla/pantalla-hz.sh quitar`.
+  La TV se queda a 75 Hz (es otro aparato y no ha fallado).
+- Para que se borre la retención: apagar por completo (no reiniciar) 30-60 min.
+- Lección: el panel BOE de 14" no aguanta 75 Hz de forma confiable (sobre todo al despertar). Se queda en 60.
+
+### 2026-11-21 17:32 - Override de pantalla quitado
+- Se borró `/Library/Displays/Contents/Resources/Overrides/DisplayVendorID-9e5/DisplayProductID-6b3`.
+
+### 2026-11-21 18:15 - Panel: sigue un poco de parpadeo y fantasma en el centro
+- Después de 1 h apagada y sin batería, el centro del panel todavía parpadea un poco y deja algo de fantasma.
+- Nueva herramienta `LimpiarPantalla [minutos]` (`pantalla/limpiar/main.swift` → `~/.local/bin/`): colores sólidos en pantalla completa,
+  cambio suave cada 10 s (sin estrobo), evita que se apague la pantalla. Sirve para ver el defecto y para lavar la retención (brillo alto, 1-2 h).
+- Pendiente: `sudo bash ~/hackintosh-mac/pantalla/pantalla-hz.sh quitar` (el override 9e5 de 75 Hz sigue instalado aunque el panel está a 60).
+
+### 2026-11-21 18:13 - Override de pantalla quitado
+- Se borró `/Library/Displays/Contents/Resources/Overrides/DisplayVendorID-9e5/DisplayProductID-6b3`.
+
+### 2026-11-21 19:50 - Todo al máximo: CPU EPP 0x00, panel fijo a 60 Hz
+- Panel interno: override de 75 Hz borrado (copia en respaldos/override-panel-75hz-20261121-195041.plist). Se queda en 60 Hz. La TV sigue a 75 Hz.
+- CPU: CPUFriendDataProvider con EPP **0x00** (máximo rendimiento, antes 0x20). Respaldo: `BITACORA-MAC/respaldos/cpu-epp-antes-20261121-195041/`.
+- GPU: rps-control y 2 GB siguen en la EFI. `pmset -a lowpowermode 0`.
+- ocvalidate: Completed validating /Volumes/EFI-MAC/EFI/OC/config.plist in 76 ms. No issues found.
+- Deshacer CPU: `sudo bash ~/hackintosh-mac/rendimiento/todo-al-maximo.sh revertir`.
+
+### 2026-11-21 19:00 - Medido: CPU y GPU al máximo
+- Aplicado `todo-al-maximo.sh` y reiniciado. Verificado: EPP cargado = **0x00** (ioreg cf-frequency-data), panel a 60 Hz sin override (solo queda el de la TV, 859), VRAM 2048 MB.
+- `powermetrics` NO sirve para la GPU en hackintosh (siempre "350 MHz / HW 0 %"). Medición propia `rendimiento/ghz-gpu` (FMA/s ÷ 192 FMA por ciclo de la HD 630):
+  **180 G FMA/s ≈ 940 MHz mínimo real** (~1.05–1.1 GHz quitando el costo del ciclo), igual con el CPU al 100 %. A 350 MHz daría 67 G FMA/s → rps-control funciona.
+- `rendimiento/ghz` corregido: ahora mide con el tiempo de CPU del hilo (antes reloj de pared, salía bajo si otros procesos le quitaban turnos).
+  **3.0 GHz en los 4 núcleos**, igual con la GPU al 100 % (máximo de fábrica 3.1).
+- `medir-todo.sh` estaba mal hecho (la carga de CPU terminaba antes de que midiera powermetrics); usar `ghz 4` y `ghz-gpu` en su lugar.
+- Panel recuperado con `LimpiarPantalla` (el gris era lo que más se notaba).
