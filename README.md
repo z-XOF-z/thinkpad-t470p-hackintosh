@@ -82,6 +82,7 @@ Al terminar tienes la carpeta `USB-T470p/` con `EFI/` y `com.apple.recovery.boot
 | **PantallaHz** + `pantalla-hz.sh` | Prueba modos de más Hz con confirmación de 30 s en todas las pantallas. ⚠️ En el panel interno **no** se recomienda (ver arriba); úsalo para la TV |
 | `tv-pantalla.sh` + `PantallaHz tv` | TV por HDMI: fuerza **RGB** (quita YCbCr del EDID: texto nítido y colores correctos) y agrega 1360×768 a **75 Hz** |
 | **MedidorFPS** | Cuadrito en la esquina inferior izquierda con FPS reales (ScreenCaptureKit, tope de 60), uso de GPU y CPU. Se prende/apaga desde BateriaT470p. Cuesta ~20 % de un núcleo de WindowServer cuando la pantalla se mueve |
+| **GPUDespierta** | Mantiene la GPU a ~1.1 GHz con pulsos de 1.5 ms cada 6 ms (el driver de Apple la baja a 350 MHz en cuanto se queda sin trabajo y el escritorio se siente lento). LaunchAgent; interruptor en BateriaT470p |
 | **LimpiarPantalla** | Colores sólidos en pantalla completa que cambian suave cada 10 s: para ver defectos del panel y quitar retención de imagen |
 | `extras/rendimiento/` | `todo-al-maximo.sh` (EPP 0x00 + panel a 60 Hz), `gpu-efi.sh` (rps-control + 2 GB), `fluidez.sh` (animaciones rápidas) y pruebas propias: `ghz.c` (GHz reales del CPU por tiempo de hilo) y `ghz-gpu.swift` (MHz reales de la GPU por FMA/s; `powermetrics` no sabe leer la GPU en hackintosh) |
 

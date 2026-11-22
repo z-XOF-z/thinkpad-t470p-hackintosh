@@ -728,3 +728,17 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
   **3.0 GHz en los 4 núcleos**, igual con la GPU al 100 % (máximo de fábrica 3.1).
 - `medir-todo.sh` estaba mal hecho (la carga de CPU terminaba antes de que midiera powermetrics); usar `ghz 4` y `ghz-gpu` en su lugar.
 - Panel recuperado con `LimpiarPantalla` (el gris era lo que más se notaba).
+
+### 2026-11-21 19:20 - GPU fija a 1.1 GHz: medido, no se puede sin kext propio
+- `rendimiento/rampa-gpu`: después de 3 s sin trabajo, lotes cortos de ~3-5 ms. La GPU sube a ~900 MHz en 3-14 ms, pero entre lotes
+  (cuando se queda unos ms sin trabajo) baja otra vez a 300-500 MHz. Con carga continua se queda en ~940+ (ver ghz-gpu).
+- La frecuencia mínima la decide el driver de Apple (RPS). No hay opción en WhateverGreen, BIOS ni macOS para fijarla.
+- Mantenerla arriba con una carga de fondo no sirve: el RPS solo sube si la GPU está ~85-95 % ocupada, así que la carga le quitaría la GPU a lo demás.
+- Única vía: kext propio que escriba el registro de frecuencia mínima de la GPU (RP min, MMIO 0xA014 / softlimit). Experimental, riesgo de congelar la GPU; probar en USB.
+
+### 2026-11-21 19:40 - GPU siempre al máximo: GPUDespierta
+- Andrew notó que con la GPU a 1.1 GHz (durante las pruebas) el escritorio pasó de ~14-20 FPS a 60 al mover el mouse: con la GPU a 350 MHz el escritorio se siente lento.
+- `rendimiento/gpu-despierta.swift` → `~/.local/bin/GPUDespierta 1.5 6`: pulsos de cálculo de 1.5 ms cada 6 ms (~20 % de la GPU, 2.9 % de un núcleo de CPU).
+  Medido con su propio pulso: continuo = 647 MHz-equivalente (tope de ese cálculo); pausa 2 ms = 97 %, 4 ms = 93 %, 8 ms = 92 %, 16 ms = 87 % del tope.
+- LaunchAgent `~/Library/LaunchAgents/com.andrew.gpudespierta.plist` (RunAtLoad + KeepAlive). Interruptor en BateriaT470p → "GPU siempre al máximo (1.1 GHz)"
+  (apagar = `launchctl bootout` + `disable`, no vuelve al iniciar sesión).

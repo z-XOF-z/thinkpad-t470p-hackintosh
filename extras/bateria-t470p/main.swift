@@ -66,6 +66,19 @@ let claveTapaTV = "DormirConTapaAunqueHayaTV"
 let claveFPS = "MostrarFPS"
 let idFPS = "com.andrew.medidorfps"
 func fpsCorriendo() -> Bool { !NSRunningApplication.runningApplications(withBundleIdentifier: idFPS).isEmpty }
+// --- GPU siempre al maximo (servicio GPUDespierta: pulsos de 1.5 ms cada 6 ms para que el driver no la baje a 350 MHz) ---
+let servicioGPU = "gui/\(getuid())/com.andrew.gpudespierta"
+let plistGPU = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/LaunchAgents/com.andrew.gpudespierta.plist").path
+@discardableResult func launchctl(_ a: [String]) -> Int32 {
+    let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/launchctl"); p.arguments = a
+    p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
+    try? p.run(); p.waitUntilExit(); return p.terminationStatus
+}
+func gpuDespierta() -> Bool { launchctl(["print", servicioGPU]) == 0 }
+func ponerGPUDespierta(_ v: Bool) {
+    if v { launchctl(["enable", servicioGPU]); launchctl(["bootstrap", "gui/\(getuid())", plistGPU]) }
+    else { launchctl(["bootout", servicioGPU]); launchctl(["disable", servicioGPU]) }   // disable: no vuelve al iniciar sesion
+}
 func abrirFPS() {
     let c = NSWorkspace.OpenConfiguration(); c.activates = false
     NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: "/Applications/MedidorFPS.app"), configuration: c)
@@ -187,6 +200,10 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         fp.target = self
         fp.state = fpsCorriendo() ? .on : .off
         m.addItem(fp)
+        let gd = NSMenuItem(title: "GPU siempre al máximo (1.1 GHz)", action: #selector(gpu(_:)), keyEquivalent: "")
+        gd.target = self
+        gd.state = gpuDespierta() ? .on : .off
+        m.addItem(gd)
         m.addItem(.separator())
         let s = NSMenuItem(title: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         m.addItem(s)
@@ -199,6 +216,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func pausa(_ s: NSMenuItem) { pausarCarga(!cargaEnPausa()) }
     @objc func tapaTV(_ s: NSMenuItem) { UserDefaults.standard.set(!UserDefaults.standard.bool(forKey: claveTapaTV), forKey: claveTapaTV) }
+    @objc func gpu(_ s: NSMenuItem) { ponerGPUDespierta(!gpuDespierta()) }
     @objc func fps(_ s: NSMenuItem) {
         if fpsCorriendo() {
             NSRunningApplication.runningApplications(withBundleIdentifier: idFPS).forEach { $0.terminate() }
