@@ -8,8 +8,8 @@
 	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
 	<key>CFBundleName</key><string>GraficaT470p</string>
 	<key>CFBundlePackageType</key><string>KEXT</string>
-	<key>CFBundleShortVersionString</key><string>1.0.0</string>
-	<key>CFBundleVersion</key><string>1.0.0</string>
+	<key>CFBundleShortVersionString</key><string>1.1.0</string>
+	<key>CFBundleVersion</key><string>1.1.0</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>GraficaT470p</key>
@@ -22,11 +22,11 @@
 		</dict>
 	</dict>
 	<key>NSHumanReadableCopyright</key><string>Andrew (XOF) 2026. Basado en WhateverGreen (acidanthera, BSD-3).</string>
-	<key>OSBundleCompatibleVersion</key><string>1.0.0</string>
+	<key>OSBundleCompatibleVersion</key><string>1.1.0</string>
 	<key>OSBundleLibraries</key>
 	<dict>
 		<key>as.vit9696.Lilu</key><string>1.2.0</string>
-		<key>com.apple.iokit.IOPCIFamily</key><string>1.0.0b1</string>
+		<key>com.apple.iokit.IOPCIFamily</key><string>1.1.0b1</string>
 		<key>com.apple.kpi.bsd</key><string>12.0.0</string>
 		<key>com.apple.kpi.iokit</key><string>12.0.0</string>
 		<key>com.apple.kpi.libkern</key><string>12.0.0</string>

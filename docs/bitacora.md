@@ -770,3 +770,11 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
   del kernel 25.6 resueltos; los 12 de Lilu están exportados por el Lilu 1.7.2 de la EFI. ocvalidate OK con el kext después de WhateverGreen.
 - Probar: `sudo bash ~/hackintosh-mac/kext-gpu/gpu-kext.sh listar` y luego `usb diskXsY` (copia EFI-MAC a la USB + kext). F12 → USB.
 - Apagar si algo falla: boot-arg `-gt470poff`, o arrancar normal desde el disco (EFI-MAC no se toca hasta `gpu-kext.sh disco`).
+
+### 2026-11-21 22:00 - GraficaT470p 1.1.0: también sin RC6 y con frecuencia real en ioreg
+- Encontrado en el driver de Apple: opción interna `forceDisableRC6` (bit 25 de las banderas en IntelAccelerator+0x1148), que
+  `IGTelemetryManager::operation` activa llamando `IntelAccelerator::SafeForceWake(true)` (referencia contada de "despierto").
+- El kext ahora toma esa referencia cuando el acelerador ya publica `PerformanceStatistics`, la suelta en `kIOMessageSystemWillSleep`
+  y la retoma al despertar (≤ 2 s). Así la GPU no se apaga entre trabajos ni tiene que volver a subir de frecuencia.
+- ioreg `GraficaT470p`: "Frecuencia actual MHz" (RPSTAT1), "Estado GT" (0x138060), "Tiempo dormida % (RC6)" (0x138108), RC6, ganchos y bajadas evitadas.
+- Boot-arg nuevo `-gt470prc6` (deja el RC6 como Apple). Sigue sin instalar: probar en USB con `kext-gpu/gpu-kext.sh`.

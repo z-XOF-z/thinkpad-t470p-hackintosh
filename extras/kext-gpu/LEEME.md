@@ -17,6 +17,14 @@ Desensamblado de `AppleIntelKBLGraphics` (Tahoe 26.7): el driver pide frecuencia
 | `IGHardwareCommandStreamer5::setGTFrequencyMMIO(uint32)` | `submitExecList`, `handleChangeFrequencyInterrupt` | siempre pide RP0 |
 | `IGHardwareRingBuffer::patchFrequencyRequest(uint32, uint32)` | `submitExecList` (MI_LOAD_REGISTER_IMM dentro de los comandos) | siempre pide RP0 |
 
+Además **apaga el RC6** (la GPU ya no se duerme entre trabajos), con el mismo mecanismo que la opción interna
+`forceDisableRC6` del driver (`IGTelemetryManager::operation` pone el bit 25 de las banderas y llama
+`IntelAccelerator::SafeForceWake(true)`): el kext toma una referencia `SafeForceWake(true)` cuando el acelerador ya arrancó,
+la suelta antes de dormir la Mac (`registerPrioritySleepWakeInterest`) y la vuelve a tomar al despertar.
+
+En `ioreg` publica la **frecuencia real** (`GEN6_RPSTAT1` 0xA01C, CAGF × 50/3 MHz), el estado RC (`GEN6_GT_CORE_STATUS` 0x138060)
+y el **% de tiempo dormida** (`GEN6_GT_GFX_RC6` 0x138108, ×1.28 µs). Con el kext: ~1100 MHz y 0 %.
+
 Valor: `(3 << 23) * RP0` (mismo formato que WhateverGreen), RP0 leído de `GEN6_RP_STATE_CAP` (MCHBAR 0x145998) en BAR0 de la IGPU.
 
 ## Compilar (sin Xcode)
@@ -30,4 +38,4 @@ sudo bash gpu-kext.sh disco             # instalar en EFI-MAC
 sudo bash gpu-kext.sh quitar
 ```
 Verificar: `ioreg -l -w0 -c GraficaT470p` (RP0, ganchos, "Bajadas evitadas") y `rendimiento/rampa-gpu` con GPUDespierta apagado.
-Boot-args: `-gt470poff` (desactiva), `gt470pmhz=NNN` (frecuencia fija).
+Boot-args: `-gt470poff` (desactiva todo), `-gt470prc6` (deja el RC6 como Apple), `gt470pmhz=NNN` (frecuencia fija).

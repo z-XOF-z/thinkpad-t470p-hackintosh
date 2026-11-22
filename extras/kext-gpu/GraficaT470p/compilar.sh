@@ -5,11 +5,11 @@ cd "$(dirname "$0")"
 F=../fuentes
 SDK=$F/MacKernelSDK
 LILU=$F/Lilu/Lilu
-OUT=build; rm -rf $OUT; mkdir -p $OUT/GraficaT470p.kext/Contents/MacOS
+OUT=build; rm -rf $OUT/GraficaT470p.kext $OUT/*.o; mkdir -p $OUT/GraficaT470p.kext/Contents/MacOS
 COMUN=(-arch x86_64 -mkernel -nostdinc -fno-builtin -fno-common -fno-stack-protector -fno-asynchronous-unwind-tables
        -mmacosx-version-min=10.15 -O2 -g0
        -DKERNEL -DKERNEL_PRIVATE -DDRIVER_PRIVATE -DAPPLE -DNeXT
-       -DPRODUCT_NAME=GraficaT470p -DMODULE_VERSION=1.0.0
+       -DPRODUCT_NAME=GraficaT470p -DMODULE_VERSION=1.1.0
        -I"$SDK/Headers" -I"$LILU" -Wno-unknown-warning-option -Wno-ossharedptr-misuse -Wno-vla -Wno-deprecated-declarations)
 clang++ "${COMUN[@]}" -std=c++17 -fapple-kext -fno-exceptions -fno-rtti -c kern_start.cpp -o $OUT/kern_start.o
 clang++ "${COMUN[@]}" -std=c++17 -fapple-kext -fno-exceptions -fno-rtti -c "$LILU/Library/plugin_start.cpp" -o $OUT/plugin_start.o

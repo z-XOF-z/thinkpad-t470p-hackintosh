@@ -17,8 +17,11 @@
 //
 //  Boot-args:  -gt470poff      no hace nada (para recuperar si algo falla)
 //              gt470pmhz=NNN   frecuencia fija en MHz (por defecto la maxima de fabrica, RP0)
+//              -gt470prc6      deja el RC6 como Apple (la GPU se apaga cuando no hay trabajo)
 //              -gt470pdbg      mensajes de depuracion (con Lilu DEBUG)
-//  En ioreg (clase GraficaT470p): RP0, valor pedido, y cuantas veces el driver quiso bajar la frecuencia.
+//  Ademas apaga el RC6 (la GPU no se duerme entre trabajos) con el mismo mecanismo que la opcion interna
+//  "forceDisableRC6" del driver: una referencia IntelAccelerator::SafeForceWake(true). Se suelta al dormir la Mac.
+//  En ioreg (clase GraficaT470p): frecuencia ACTUAL (registro RPSTAT1), estado RC, RP0 y cuantas bajadas se evitaron.
 //
 
 #include <Headers/plugin_start.hpp>
@@ -28,6 +31,8 @@
 #include <IOKit/IOService.h>
 #include <IOKit/pci/IOPCIDevice.h>
 #include <kern/thread_call.h>
+#include <IOKit/IOMessage.h>
+#include <IOKit/pwr_mgt/RootDomain.h>
 
 namespace {
 
@@ -35,6 +40,9 @@ constexpr uint32_t GEN9_FREQUENCY_SHIFT = 23;
 constexpr uint32_t GEN9_FREQ_SCALER     = 3;
 constexpr uint32_t MCHBAR_MIRROR_BASE   = 0x140000;
 constexpr uint32_t GEN6_RP_STATE_CAP    = MCHBAR_MIRROR_BASE + 0x5998;
+constexpr uint32_t GEN6_RPSTAT1         = 0xA01C;              // bits 31:23 = CAGF (frecuencia actual, x 50/3 MHz)
+constexpr uint32_t GEN6_GT_CORE_STATUS  = 0x138060;            // bits 2:0 = estado RC (0 = RC0 despierta)
+constexpr uint32_t GEN6_GT_GFX_RC6      = 0x138108;            // contador de tiempo en RC6 (unidades de 1.28 us)
 constexpr uint32_t RP0_RESPALDO         = 22;   // 22 x 50 MHz = 1100 MHz (maximo de la HD 630 en el i5-7300HQ)
 
 const char *rutaKBL[] { "/System/Library/Extensions/AppleIntelKBLGraphics.kext/Contents/MacOS/AppleIntelKBLGraphics" };
@@ -51,6 +59,17 @@ bool gancho5 = false, gancho4 = false, ganchoAnillo = false;
 using SetFreqT = void (*)(void *, uint32_t);
 using PatchReqT = void (*)(void *, uint32_t, uint32_t);
 mach_vm_address_t orgSetFreq5 = 0, orgSetFreq4 = 0, orgPatchReq = 0;
+
+// Sin RC6: igual que la opcion interna "forceDisableRC6" del driver de Apple (IGTelemetryManager), se toma una
+// referencia de despierto con IntelAccelerator::SafeForceWake(true) (lleva cuenta de referencias). Asi la GPU no se apaga
+// entre trabajos y no tiene que volver a subir. Se suelta antes de dormir la Mac y se vuelve a tomar al despertar.
+mach_vm_address_t orgSafeForceWake = 0;
+using SafeForceWakeT = void (*)(void *, bool);
+IOService *acelerador = nullptr;
+bool sinRC6 = true;                 // boot-arg -gt470prc6 lo deja como Apple (con RC6)
+volatile bool despiertoTomado = false, durmiendo = false;
+IONotifier *avisoDormir = nullptr;
+uint32_t mhzActual = 0, estadoRC = 0xFF, rc6Antes = 0, pctRC6 = 0;
 
 IOPCIDevice *gpu = nullptr;
 IOMemoryMap *mapa = nullptr;
@@ -109,6 +128,42 @@ void ganchoPatchReq(void *that, uint32_t posicion, uint32_t v) {
 	FunctionCast(ganchoPatchReq, orgPatchReq)(that, posicion, pedirMax(v));
 }
 
+inline uint32_t leerReg(uint32_t r) {
+	return mapa ? *reinterpret_cast<volatile uint32_t *>(mapa->getVirtualAddress() + r) : 0;
+}
+
+void tomarDespierto() {
+	if (!sinRC6 || despiertoTomado || durmiendo || !orgSafeForceWake) return;
+	if (!acelerador) {
+		auto m = IOService::serviceMatching("IntelAccelerator");
+		if (!m) return;
+		auto it = IOService::getMatchingServices(m);
+		m->release();
+		if (!it) return;
+		if (auto s = OSDynamicCast(IOService, it->getNextObject())) { acelerador = s; acelerador->retain(); }
+		it->release();
+		if (!acelerador) return;
+	}
+	// Esperar a que el acelerador este trabajando de verdad (publica sus estadisticas cuando ya arranco)
+	if (acelerador->isInactive() || !acelerador->getProperty("PerformanceStatistics")) return;
+	reinterpret_cast<SafeForceWakeT>(orgSafeForceWake)(acelerador, true);
+	despiertoTomado = true;
+	SYSLOG("gt470p", "RC6 apagado: referencia de despierto tomada");
+}
+
+void soltarDespierto() {
+	if (!despiertoTomado || !acelerador || !orgSafeForceWake) return;
+	reinterpret_cast<SafeForceWakeT>(orgSafeForceWake)(acelerador, false);
+	despiertoTomado = false;
+	SYSLOG("gt470p", "referencia de despierto soltada");
+}
+
+IOReturn alDormirDespertar(void *, void *, UInt32 tipo, IOService *, void *, vm_size_t) {
+	if (tipo == kIOMessageSystemWillSleep) { durmiendo = true; soltarDespierto(); }
+	else if (tipo == kIOMessageSystemHasPoweredOn) { durmiendo = false; }   // publicar() la vuelve a tomar en <= 2 s
+	return kIOReturnSuccess;
+}
+
 void publicar(thread_call_param_t, thread_call_param_t) {
 	static uint32_t intentos = 0;
 	if ((rp0Fuente == 0 || rp0Fuente == 2) && intentos < 10) {   // reintentar unas veces si no se pudo leer
@@ -117,7 +172,22 @@ void publicar(thread_call_param_t, thread_call_param_t) {
 		leerRP0();
 	}
 	auto yo = ADDPR(selfInstance);
+	if (yo && !avisoDormir) avisoDormir = registerPrioritySleepWakeInterest(alDormirDespertar, yo);
+	tomarDespierto();
+	if (mapa && !durmiendo) {
+		estadoRC = leerReg(GEN6_GT_CORE_STATUS) & 0x7;
+		mhzActual = estadoRC == 0 ? ((leerReg(GEN6_RPSTAT1) >> 23) & 0x1FF) * 50 / 3 : 0;
+		// % del tiempo dormida en los ultimos 2 s: (delta del contador x 1.28 us) / 2 s
+		uint32_t rc6 = leerReg(GEN6_GT_GFX_RC6);
+		if (rc6Antes) pctRC6 = (uint32_t)(((uint64_t)(rc6 - rc6Antes) * 128 / 100) / 20000);   // us / 2e6 us * 100
+		if (pctRC6 > 100) pctRC6 = 100;
+		rc6Antes = rc6 ? rc6 : 1;
+	}
 	if (yo) {
+		yo->setProperty("Frecuencia actual MHz", mhzActual, 32);
+		yo->setProperty("Tiempo dormida % (RC6)", pctRC6, 32);
+		yo->setProperty("Estado GT", estadoRC == 0 ? "RC0 (despierta)" : estadoRC == 0xFF ? "?" : "RC6 (dormida)");
+		yo->setProperty("RC6", !sinRC6 ? "como Apple (boot-arg -gt470prc6)" : despiertoTomado ? "APAGADO (GPU siempre despierta)" : durmiendo ? "Mac dormida" : "esperando al acelerador");
 		yo->setProperty("RP0 MHz", rp0 * 50, 32);
 		yo->setProperty("RP0 fuente", rp0Fuente == 1 ? "leido de la GPU" : rp0Fuente == 2 ? "respaldo 1100 MHz" : rp0Fuente == 3 ? "boot-arg gt470pmhz" : "aun no");
 		yo->setProperty("Valor pedido 0xA008", valorMax, 32);
@@ -145,7 +215,10 @@ void alCargarKext(void *, KernelPatcher &patcher, size_t index, mach_vm_address_
 	ganchoAnillo = patcher.routeMultiple(index, &reqA, 1, address, size);
 	if (!ganchoAnillo) { SYSLOG("gt470p", "no pude enganchar patchFrequencyRequest (%d)", patcher.getError()); patcher.clearError(); }
 
-	SYSLOG("gt470p", "ganchos: CS5 %d, CS4 %d, anillo %d", gancho5, gancho4, ganchoAnillo);
+	orgSafeForceWake = patcher.solveSymbol(index, "__ZN16IntelAccelerator13SafeForceWakeEb", address, size);
+	if (!orgSafeForceWake) { SYSLOG("gt470p", "no encontre SafeForceWake: RC6 queda como Apple"); patcher.clearError(); }
+
+	SYSLOG("gt470p", "ganchos: CS5 %d, CS4 %d, anillo %d, SafeForceWake %d", gancho5, gancho4, ganchoAnillo, orgSafeForceWake != 0);
 }
 
 void alArrancarPatcher(void *, KernelPatcher &) {
@@ -163,6 +236,7 @@ void alArrancarPatcher(void *, KernelPatcher &) {
 void iniciar() {
 	SYSLOG("gt470p", "GraficaT470p: GPU siempre al maximo");
 	rp0 = RP0_RESPALDO; calcularValor();   // valor seguro desde el arranque
+	sinRC6 = !checkKernelArgument("-gt470prc6");
 	lilu.onPatcherLoadForce(alArrancarPatcher);
 	lilu.onKextLoadForce(&kextKBL, 1, alCargarKext);
 	publicador = thread_call_allocate(publicar, nullptr);
