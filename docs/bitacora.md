@@ -760,3 +760,13 @@ Hay una copia en macOS, en `~/hackintosh-mac/`.
   Medido: 1080p60 sin error, **6 cuadros perdidos de 1065**, GPU al 37 %. Se pierde 1440p/4K en YouTube (solo hay VP9/AV1).
 - Con MedidorFPS prendido el mismo video perdía ~30 % de cuadros (la captura de pantalla compite): apagarlo para ver videos.
 - Deshacer: `defaults delete com.apple.Safari "WebKitPreferences.vp9DecoderEnabled"`.
+
+### 2026-11-21 21:30 - GraficaT470p.kext: kext propio para la GPU (experimental, sin instalar)
+- Base: parche RPS control de WhateverGreen 1.7.1 (`kern_igfx_pm.cpp`). Fuentes en `kext-gpu/fuentes/` (WhateverGreen 1.7.1, Lilu 1.7.2, MacKernelSDK).
+- Desensamblado `AppleIntelKBLGraphics` (OCLP-Mod, Tahoe): la frecuencia se escribe en 0xA008 desde `CS5::setGTFrequencyMMIO`
+  (la llaman `submitExecList` y el temporizador `handleChangeFrequencyInterrupt`, que es el que la baja) y desde
+  `IGHardwareRingBuffer::patchFrequencyRequest` (MI_LOAD_REGISTER_IMM en los comandos). El kext intercepta las dos y siempre pide RP0.
+- Compilado sin Xcode (`kext-gpu/GraficaT470p/compilar.sh`, clang + MacKernelSDK + libkmodc++ + cc_kext). `kmutil libraries`: 295 símbolos
+  del kernel 25.6 resueltos; los 12 de Lilu están exportados por el Lilu 1.7.2 de la EFI. ocvalidate OK con el kext después de WhateverGreen.
+- Probar: `sudo bash ~/hackintosh-mac/kext-gpu/gpu-kext.sh listar` y luego `usb diskXsY` (copia EFI-MAC a la USB + kext). F12 → USB.
+- Apagar si algo falla: boot-arg `-gt470poff`, o arrancar normal desde el disco (EFI-MAC no se toca hasta `gpu-kext.sh disco`).
